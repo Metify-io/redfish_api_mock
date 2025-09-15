@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -405,6 +407,9 @@ func simpleUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	port := flag.String("port", "8080", "Port to listen on")
+	flag.Parse()
+	
 	r := mux.NewRouter()
 	
 	// Apply basic auth to all routes
@@ -447,7 +452,8 @@ func main() {
 		http.NotFound(w, r)
 	})
 	
-	log.Println("Starting RedFish Mock Server on :8080")
+	addr := fmt.Sprintf(":%s", *port)
+	log.Printf("Starting RedFish Mock Server on %s", addr)
 	log.Println("Default credentials: admin / password")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Fatal(http.ListenAndServe(addr, r))
 }
