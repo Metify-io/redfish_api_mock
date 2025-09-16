@@ -108,7 +108,7 @@ The server returns realistic mock data including:
 ### Get Service Root
 
 ```bash
-curl -u admin:password http://localhost:8080/redfish/v1/ | jq
+curl http://localhost:8080/redfish/v1/ | jq
 ```
 
 ### List All Systems
