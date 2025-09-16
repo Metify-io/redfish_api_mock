@@ -1,14 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 )
 
 type ServiceRoot struct {
@@ -174,25 +171,14 @@ type License struct {
 	Links              struct{} `json:"Links"`
 }
 
-func basicAuth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		username, password, ok := r.BasicAuth()
-		if !ok || username != "admin" || password != "password" {
-			w.Header().Set("WWW-Authenticate", `Basic realm="Redfish"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, r)
+func basicAuth() gin.HandlerFunc {
+	return gin.BasicAuth(gin.Accounts{
+		"admin": "password",
 	})
 }
 
-func jsonResponse(w http.ResponseWriter, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("OData-Version", "4.0")
-	json.NewEncoder(w).Encode(data)
-}
-
-func getServiceRoot(w http.ResponseWriter, r *http.Request) {
+func getServiceRoot(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
 	serviceRoot := ServiceRoot{
 		ODataContext:   "/redfish/v1/$metadata#ServiceRoot.ServiceRoot",
 		ODataType:      "#ServiceRoot.v1_15_0.ServiceRoot",
@@ -221,10 +207,11 @@ func getServiceRoot(w http.ResponseWriter, r *http.Request) {
 		UpdateService:  Link{ODataID: "/redfish/v1/UpdateService"},
 		LicenseService: Link{ODataID: "/redfish/v1/LicenseService"},
 	}
-	jsonResponse(w, serviceRoot)
+	c.JSON(http.StatusOK, serviceRoot)
 }
 
-func getSystemsCollection(w http.ResponseWriter, r *http.Request) {
+func getSystemsCollection(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
 	collection := Collection{
 		ODataContext: "/redfish/v1/$metadata#ComputerSystemCollection.ComputerSystemCollection",
 		ODataType:    "#ComputerSystemCollection.ComputerSystemCollection",
@@ -235,12 +222,12 @@ func getSystemsCollection(w http.ResponseWriter, r *http.Request) {
 			{ODataID: "/redfish/v1/Systems/1"},
 		},
 	}
-	jsonResponse(w, collection)
+	c.JSON(http.StatusOK, collection)
 }
 
-func getSystem(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	systemID := vars["id"]
+func getSystem(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
+	systemID := c.Param("id")
 
 	system := ComputerSystem{
 		ODataContext: "/redfish/v1/$metadata#ComputerSystem.ComputerSystem",
@@ -266,10 +253,11 @@ func getSystem(w http.ResponseWriter, r *http.Request) {
 		},
 		Status: Status{State: "Enabled", Health: "OK"},
 	}
-	jsonResponse(w, system)
+	c.JSON(http.StatusOK, system)
 }
 
-func getChassisCollection(w http.ResponseWriter, r *http.Request) {
+func getChassisCollection(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
 	collection := Collection{
 		ODataContext: "/redfish/v1/$metadata#ChassisCollection.ChassisCollection",
 		ODataType:    "#ChassisCollection.ChassisCollection",
@@ -280,12 +268,12 @@ func getChassisCollection(w http.ResponseWriter, r *http.Request) {
 			{ODataID: "/redfish/v1/Chassis/1"},
 		},
 	}
-	jsonResponse(w, collection)
+	c.JSON(http.StatusOK, collection)
 }
 
-func getChassis(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	chassisID := vars["id"]
+func getChassis(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
+	chassisID := c.Param("id")
 
 	chassis := Chassis{
 		ODataContext: "/redfish/v1/$metadata#Chassis.Chassis",
@@ -300,10 +288,11 @@ func getChassis(w http.ResponseWriter, r *http.Request) {
 		PartNumber:   "MOCK-CHS-001",
 		Status:       Status{State: "Enabled", Health: "OK"},
 	}
-	jsonResponse(w, chassis)
+	c.JSON(http.StatusOK, chassis)
 }
 
-func getManagersCollection(w http.ResponseWriter, r *http.Request) {
+func getManagersCollection(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
 	collection := Collection{
 		ODataContext: "/redfish/v1/$metadata#ManagerCollection.ManagerCollection",
 		ODataType:    "#ManagerCollection.ManagerCollection",
@@ -314,12 +303,12 @@ func getManagersCollection(w http.ResponseWriter, r *http.Request) {
 			{ODataID: "/redfish/v1/Managers/1"},
 		},
 	}
-	jsonResponse(w, collection)
+	c.JSON(http.StatusOK, collection)
 }
 
-func getManager(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	managerID := vars["id"]
+func getManager(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
+	managerID := c.Param("id")
 
 	manager := Manager{
 		ODataContext:    "/redfish/v1/$metadata#Manager.Manager",
@@ -331,10 +320,11 @@ func getManager(w http.ResponseWriter, r *http.Request) {
 		FirmwareVersion: "1.0.0",
 		Status:          Status{State: "Enabled", Health: "OK"},
 	}
-	jsonResponse(w, manager)
+	c.JSON(http.StatusOK, manager)
 }
 
-func getUpdateService(w http.ResponseWriter, r *http.Request) {
+func getUpdateService(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
 	updateService := UpdateService{
 		ODataContext:      "/redfish/v1/$metadata#UpdateService.UpdateService",
 		ODataType:         "#UpdateService.v1_12_0.UpdateService",
@@ -351,10 +341,11 @@ func getUpdateService(w http.ResponseWriter, r *http.Request) {
 		},
 		Status: Status{State: "Enabled", Health: "OK"},
 	}
-	jsonResponse(w, updateService)
+	c.JSON(http.StatusOK, updateService)
 }
 
-func getFirmwareInventoryCollection(w http.ResponseWriter, r *http.Request) {
+func getFirmwareInventoryCollection(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
 	collection := Collection{
 		ODataContext: "/redfish/v1/$metadata#SoftwareInventoryCollection.SoftwareInventoryCollection",
 		ODataType:    "#SoftwareInventoryCollection.SoftwareInventoryCollection",
@@ -367,12 +358,12 @@ func getFirmwareInventoryCollection(w http.ResponseWriter, r *http.Request) {
 			{ODataID: "/redfish/v1/UpdateService/FirmwareInventory/NIC"},
 		},
 	}
-	jsonResponse(w, collection)
+	c.JSON(http.StatusOK, collection)
 }
 
-func getFirmwareInventoryItem(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	itemID := vars["id"]
+func getFirmwareInventoryItem(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
+	itemID := c.Param("id")
 
 	var inventory SoftwareInventory
 
@@ -414,27 +405,23 @@ func getFirmwareInventoryItem(w http.ResponseWriter, r *http.Request) {
 			SoftwareId:   "NIC-3.2.1",
 		}
 	default:
-		http.NotFound(w, r)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
 
-	jsonResponse(w, inventory)
+	c.JSON(http.StatusOK, inventory)
 }
 
-func simpleUpdate(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func simpleUpdate(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
 	var req SimpleUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
 		return
 	}
 
 	if req.ImageURI == "" {
-		http.Error(w, "ImageURI is required", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ImageURI is required"})
 		return
 	}
 
@@ -449,12 +436,12 @@ func simpleUpdate(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	w.Header().Set("Location", "/redfish/v1/TaskService/Tasks/1")
-	w.WriteHeader(http.StatusAccepted)
-	jsonResponse(w, response)
+	c.Header("Location", "/redfish/v1/TaskService/Tasks/1")
+	c.JSON(http.StatusAccepted, response)
 }
 
-func getLicenseService(w http.ResponseWriter, r *http.Request) {
+func getLicenseService(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
 	licenseService := LicenseService{
 		ODataContext: "/redfish/v1/$metadata#LicenseService.LicenseService",
 		ODataType:    "#LicenseService.v1_1_0.LicenseService",
@@ -464,10 +451,11 @@ func getLicenseService(w http.ResponseWriter, r *http.Request) {
 		Licenses:     Link{ODataID: "/redfish/v1/LicenseService/Licenses"},
 		Status:       Status{State: "Enabled", Health: "OK"},
 	}
-	jsonResponse(w, licenseService)
+	c.JSON(http.StatusOK, licenseService)
 }
 
-func getLicensesCollection(w http.ResponseWriter, r *http.Request) {
+func getLicensesCollection(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
 	collection := Collection{
 		ODataContext: "/redfish/v1/$metadata#LicenseCollection.LicenseCollection",
 		ODataType:    "#LicenseCollection.LicenseCollection",
@@ -479,12 +467,12 @@ func getLicensesCollection(w http.ResponseWriter, r *http.Request) {
 			{ODataID: "/redfish/v1/LicenseService/Licenses/BIOS-License"},
 		},
 	}
-	jsonResponse(w, collection)
+	c.JSON(http.StatusOK, collection)
 }
 
-func getLicense(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	licenseID := vars["id"]
+func getLicense(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
+	licenseID := c.Param("id")
 
 	var license License
 
@@ -527,69 +515,60 @@ func getLicense(w http.ResponseWriter, r *http.Request) {
 			Links:         struct{}{},
 		}
 	default:
-		http.NotFound(w, r)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 		return
 	}
 
-	jsonResponse(w, license)
+	c.JSON(http.StatusOK, license)
 }
 
 func main() {
 	port := flag.String("port", "8080", "Port to listen on")
+	host := flag.String("host", "localhost", "Host to listen on")
 	flag.Parse()
 
-	r := mux.NewRouter()
+	r := gin.Default()
 
 	// Public endpoints (no auth required)
-	r.HandleFunc("/redfish/v1/", getServiceRoot).Methods("GET")
-	r.HandleFunc("/redfish/v1", getServiceRoot).Methods("GET")
-	r.HandleFunc("/redfish/v1/Managers", getManagersCollection).Methods("GET")
-	r.HandleFunc("/redfish/v1/Managers/", getManagersCollection).Methods("GET")
+	r.GET("/redfish/v1/", getServiceRoot)
+	r.GET("/redfish/v1", getServiceRoot)
+	r.GET("/redfish/v1/Managers", getManagersCollection)
+	r.GET("/redfish/v1/Managers/", getManagersCollection)
 
 	// Protected endpoints (require auth)
-	protected := r.PathPrefix("/redfish/v1").Subrouter()
-	protected.Use(basicAuth)
+	protected := r.Group("/redfish/v1")
+	protected.Use(basicAuth())
 
 	// Systems endpoints
-	protected.HandleFunc("/Systems", getSystemsCollection).Methods("GET")
-	protected.HandleFunc("/Systems/", getSystemsCollection).Methods("GET")
-	protected.HandleFunc("/Systems/{id}", getSystem).Methods("GET")
+	protected.GET("/Systems", getSystemsCollection)
+	protected.GET("/Systems/", getSystemsCollection)
+	protected.GET("/Systems/:id", getSystem)
 
 	// Chassis endpoints
-	protected.HandleFunc("/Chassis", getChassisCollection).Methods("GET")
-	protected.HandleFunc("/Chassis/", getChassisCollection).Methods("GET")
-	protected.HandleFunc("/Chassis/{id}", getChassis).Methods("GET")
+	protected.GET("/Chassis", getChassisCollection)
+	protected.GET("/Chassis/", getChassisCollection)
+	protected.GET("/Chassis/:id", getChassis)
 
 	// Manager individual endpoints (still protected)
-	protected.HandleFunc("/Managers/{id}", getManager).Methods("GET")
+	protected.GET("/Managers/:id", getManager)
 
 	// UpdateService endpoints
-	protected.HandleFunc("/UpdateService", getUpdateService).Methods("GET")
-	protected.HandleFunc("/UpdateService/", getUpdateService).Methods("GET")
-	protected.HandleFunc("/UpdateService/FirmwareInventory", getFirmwareInventoryCollection).Methods("GET")
-	protected.HandleFunc("/UpdateService/FirmwareInventory/", getFirmwareInventoryCollection).Methods("GET")
-	protected.HandleFunc("/UpdateService/FirmwareInventory/{id}", getFirmwareInventoryItem).Methods("GET")
-	protected.HandleFunc("/UpdateService/Actions/UpdateService.SimpleUpdate", simpleUpdate).Methods("POST")
+	protected.GET("/UpdateService", getUpdateService)
+	protected.GET("/UpdateService/", getUpdateService)
+	protected.GET("/UpdateService/FirmwareInventory", getFirmwareInventoryCollection)
+	protected.GET("/UpdateService/FirmwareInventory/", getFirmwareInventoryCollection)
+	protected.GET("/UpdateService/FirmwareInventory/:id", getFirmwareInventoryItem)
+	protected.POST("/UpdateService/Actions/UpdateService.SimpleUpdate", simpleUpdate)
 
 	// LicenseService endpoints
-	protected.HandleFunc("/LicenseService", getLicenseService).Methods("GET")
-	protected.HandleFunc("/LicenseService/", getLicenseService).Methods("GET")
-	protected.HandleFunc("/LicenseService/Licenses", getLicensesCollection).Methods("GET")
-	protected.HandleFunc("/LicenseService/Licenses/", getLicensesCollection).Methods("GET")
-	protected.HandleFunc("/LicenseService/Licenses/{id}", getLicense).Methods("GET")
+	protected.GET("/LicenseService", getLicenseService)
+	protected.GET("/LicenseService/", getLicenseService)
+	protected.GET("/LicenseService/Licenses", getLicensesCollection)
+	protected.GET("/LicenseService/Licenses/", getLicensesCollection)
+	protected.GET("/LicenseService/Licenses/:id", getLicense)
 
-	// Handle trailing slashes
-	r.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/" {
-			newPath := strings.TrimSuffix(r.URL.Path, "/")
-			http.Redirect(w, r, newPath, http.StatusMovedPermanently)
-			return
-		}
-		http.NotFound(w, r)
-	})
-
-	addr := fmt.Sprintf("10.0.0.22:%s", *port)
+	addr := *host + ":" + *port
 	log.Printf("Starting RedFish Mock Server on %s", addr)
 	log.Println("Default credentials: admin / password")
-	log.Fatal(http.ListenAndServe(addr, r))
+	log.Fatal(r.Run(addr))
 }
