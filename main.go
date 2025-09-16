@@ -12,18 +12,22 @@ import (
 )
 
 type ServiceRoot struct {
-	ODataContext string `json:"@odata.context"`
-	ODataType    string `json:"@odata.type"`
-	ODataID      string `json:"@odata.id"`
-	ID           string `json:"Id"`
-	Name         string `json:"Name"`
-	RedfishVersion string `json:"RedfishVersion"`
-	UUID         string `json:"UUID"`
-	Systems      Link   `json:"Systems"`
-	Chassis      Link   `json:"Chassis"`
-	Managers     Link   `json:"Managers"`
-	SessionService Link `json:"SessionService"`
-	UpdateService Link  `json:"UpdateService"`
+	ODataContext   string                 `json:"@odata.context"`
+	ODataType      string                 `json:"@odata.type"`
+	ODataID        string                 `json:"@odata.id"`
+	ID             string                 `json:"Id"`
+	Name           string                 `json:"Name"`
+	RedfishVersion string                 `json:"RedfishVersion"`
+	UUID           string                 `json:"UUID"`
+	Product        string                 `json:"Product"`
+	Vendor         string                 `json:"Vendor"`
+	Oem            map[string]interface{} `json:"Oem"`
+	Systems        Link                   `json:"Systems"`
+	Chassis        Link                   `json:"Chassis"`
+	Managers       Link                   `json:"Managers"`
+	SessionService Link                   `json:"SessionService"`
+	UpdateService  Link                   `json:"UpdateService"`
+	LicenseService Link                   `json:"LicenseService"`
 }
 
 type Link struct {
@@ -31,35 +35,35 @@ type Link struct {
 }
 
 type Collection struct {
-	ODataContext     string `json:"@odata.context"`
-	ODataType        string `json:"@odata.type"`
-	ODataID          string `json:"@odata.id"`
-	Name             string `json:"Name"`
-	MembersCount     int    `json:"Members@odata.count"`
-	Members          []Link `json:"Members"`
+	ODataContext string `json:"@odata.context"`
+	ODataType    string `json:"@odata.type"`
+	ODataID      string `json:"@odata.id"`
+	Name         string `json:"Name"`
+	MembersCount int    `json:"Members@odata.count"`
+	Members      []Link `json:"Members"`
 }
 
 type ComputerSystem struct {
-	ODataContext    string `json:"@odata.context"`
-	ODataType       string `json:"@odata.type"`
-	ODataID         string `json:"@odata.id"`
-	ID              string `json:"Id"`
-	Name            string `json:"Name"`
-	SystemType      string `json:"SystemType"`
-	Manufacturer    string `json:"Manufacturer"`
-	Model           string `json:"Model"`
-	SerialNumber    string `json:"SerialNumber"`
-	PartNumber      string `json:"PartNumber"`
-	PowerState      string `json:"PowerState"`
-	BiosVersion     string `json:"BiosVersion"`
+	ODataContext     string           `json:"@odata.context"`
+	ODataType        string           `json:"@odata.type"`
+	ODataID          string           `json:"@odata.id"`
+	ID               string           `json:"Id"`
+	Name             string           `json:"Name"`
+	SystemType       string           `json:"SystemType"`
+	Manufacturer     string           `json:"Manufacturer"`
+	Model            string           `json:"Model"`
+	SerialNumber     string           `json:"SerialNumber"`
+	PartNumber       string           `json:"PartNumber"`
+	PowerState       string           `json:"PowerState"`
+	BiosVersion      string           `json:"BiosVersion"`
 	ProcessorSummary ProcessorSummary `json:"ProcessorSummary"`
-	MemorySummary   MemorySummary    `json:"MemorySummary"`
-	Status          Status           `json:"Status"`
+	MemorySummary    MemorySummary    `json:"MemorySummary"`
+	Status           Status           `json:"Status"`
 }
 
 type ProcessorSummary struct {
-	Count int    `json:"Count"`
-	Model string `json:"Model"`
+	Count  int    `json:"Count"`
+	Model  string `json:"Model"`
 	Status Status `json:"Status"`
 }
 
@@ -88,27 +92,27 @@ type Chassis struct {
 }
 
 type Manager struct {
-	ODataContext     string `json:"@odata.context"`
-	ODataType        string `json:"@odata.type"`
-	ODataID          string `json:"@odata.id"`
-	ID               string `json:"Id"`
-	Name             string `json:"Name"`
-	ManagerType      string `json:"ManagerType"`
-	FirmwareVersion  string `json:"FirmwareVersion"`
-	Status           Status `json:"Status"`
+	ODataContext    string `json:"@odata.context"`
+	ODataType       string `json:"@odata.type"`
+	ODataID         string `json:"@odata.id"`
+	ID              string `json:"Id"`
+	Name            string `json:"Name"`
+	ManagerType     string `json:"ManagerType"`
+	FirmwareVersion string `json:"FirmwareVersion"`
+	Status          Status `json:"Status"`
 }
 
 type UpdateService struct {
-	ODataContext      string     `json:"@odata.context"`
-	ODataType         string     `json:"@odata.type"`
-	ODataID           string     `json:"@odata.id"`
-	ID                string     `json:"Id"`
-	Name              string     `json:"Name"`
-	ServiceEnabled    bool       `json:"ServiceEnabled"`
-	HttpPushUri       string     `json:"HttpPushUri"`
-	FirmwareInventory Link       `json:"FirmwareInventory"`
+	ODataContext      string               `json:"@odata.context"`
+	ODataType         string               `json:"@odata.type"`
+	ODataID           string               `json:"@odata.id"`
+	ID                string               `json:"Id"`
+	Name              string               `json:"Name"`
+	ServiceEnabled    bool                 `json:"ServiceEnabled"`
+	HttpPushUri       string               `json:"HttpPushUri"`
+	FirmwareInventory Link                 `json:"FirmwareInventory"`
 	Actions           UpdateServiceActions `json:"Actions"`
-	Status            Status     `json:"Status"`
+	Status            Status               `json:"Status"`
 }
 
 type UpdateServiceActions struct {
@@ -132,12 +136,42 @@ type SoftwareInventory struct {
 }
 
 type SimpleUpdateRequest struct {
-	ImageURI          string   `json:"ImageURI"`
-	Targets           []string `json:"Targets,omitempty"`
-	TransferProtocol  string   `json:"TransferProtocol,omitempty"`
-	Username          string   `json:"Username,omitempty"`
-	Password          string   `json:"Password,omitempty"`
-	ForceUpdate       bool     `json:"ForceUpdate,omitempty"`
+	ImageURI         string   `json:"ImageURI"`
+	Targets          []string `json:"Targets,omitempty"`
+	TransferProtocol string   `json:"TransferProtocol,omitempty"`
+	Username         string   `json:"Username,omitempty"`
+	Password         string   `json:"Password,omitempty"`
+	ForceUpdate      bool     `json:"ForceUpdate,omitempty"`
+}
+
+type LicenseService struct {
+	ODataContext string `json:"@odata.context"`
+	ODataType    string `json:"@odata.type"`
+	ODataID      string `json:"@odata.id"`
+	ID           string `json:"Id"`
+	Name         string `json:"Name"`
+	Licenses     Link   `json:"Licenses"`
+	Status       Status `json:"Status"`
+}
+
+type License struct {
+	ODataContext       string   `json:"@odata.context"`
+	ODataType          string   `json:"@odata.type"`
+	ODataID            string   `json:"@odata.id"`
+	ID                 string   `json:"Id"`
+	Name               string   `json:"Name"`
+	LicenseType        string   `json:"LicenseType"`
+	LicenseOrigin      string   `json:"LicenseOrigin"`
+	ExpirationDate     string   `json:"ExpirationDate,omitempty"`
+	InstallDate        string   `json:"InstallDate"`
+	MaxAuthorizedCount int      `json:"MaxAuthorizedCount,omitempty"`
+	RemainingUseCount  int      `json:"RemainingUseCount,omitempty"`
+	Status             Status   `json:"Status"`
+	Manufacturer       string   `json:"Manufacturer"`
+	PartNumber         string   `json:"PartNumber,omitempty"`
+	SerialNumber       string   `json:"SerialNumber,omitempty"`
+	SKU                string   `json:"SKU,omitempty"`
+	Links              struct{} `json:"Links"`
 }
 
 func basicAuth(next http.Handler) http.Handler {
@@ -167,11 +201,25 @@ func getServiceRoot(w http.ResponseWriter, r *http.Request) {
 		Name:           "Root Service",
 		RedfishVersion: "1.18.0",
 		UUID:           "92384634-2938-2342-8820-489239905423",
+		Product:        "Mock RedFish Server v1.0",
+		Vendor:         "Mock Vendor Corporation",
+		Oem: map[string]interface{}{
+			"Vendor": map[string]interface{}{
+				"@odata.type":        "#MockVendorExtensions.v1_0_0.ServiceRoot",
+				"ServerModel":        "Mock Enterprise Server X1000",
+				"HardwareVersion":    "Rev 2.1",
+				"ManagementVersion":  "BMC 3.2.1",
+				"SupportContact":     "support@mockvendor.com",
+				"WarrantyStatus":     "Active",
+				"WarrantyExpiration": "2026-12-31",
+			},
+		},
 		Systems:        Link{ODataID: "/redfish/v1/Systems"},
 		Chassis:        Link{ODataID: "/redfish/v1/Chassis"},
 		Managers:       Link{ODataID: "/redfish/v1/Managers"},
 		SessionService: Link{ODataID: "/redfish/v1/SessionService"},
 		UpdateService:  Link{ODataID: "/redfish/v1/UpdateService"},
+		LicenseService: Link{ODataID: "/redfish/v1/LicenseService"},
 	}
 	jsonResponse(w, serviceRoot)
 }
@@ -193,7 +241,7 @@ func getSystemsCollection(w http.ResponseWriter, r *http.Request) {
 func getSystem(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	systemID := vars["id"]
-	
+
 	system := ComputerSystem{
 		ODataContext: "/redfish/v1/$metadata#ComputerSystem.ComputerSystem",
 		ODataType:    "#ComputerSystem.v1_22_0.ComputerSystem",
@@ -201,15 +249,15 @@ func getSystem(w http.ResponseWriter, r *http.Request) {
 		ID:           systemID,
 		Name:         "System",
 		SystemType:   "Physical",
-		Manufacturer: "Mock Vendor",
+		Manufacturer: "MetifyIO",
 		Model:        "Mock Server X1000",
 		SerialNumber: "MOCK123456789",
 		PartNumber:   "MOCK-SRV-001",
 		PowerState:   "On",
 		BiosVersion:  "1.0.0",
 		ProcessorSummary: ProcessorSummary{
-			Count: 2,
-			Model: "Mock CPU X5000",
+			Count:  2,
+			Model:  "Mock CPU X5000",
 			Status: Status{State: "Enabled", Health: "OK"},
 		},
 		MemorySummary: MemorySummary{
@@ -238,7 +286,7 @@ func getChassisCollection(w http.ResponseWriter, r *http.Request) {
 func getChassis(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	chassisID := vars["id"]
-	
+
 	chassis := Chassis{
 		ODataContext: "/redfish/v1/$metadata#Chassis.Chassis",
 		ODataType:    "#Chassis.v1_25_0.Chassis",
@@ -246,7 +294,7 @@ func getChassis(w http.ResponseWriter, r *http.Request) {
 		ID:           chassisID,
 		Name:         "Chassis",
 		ChassisType:  "RackMount",
-		Manufacturer: "Mock Vendor",
+		Manufacturer: "Vendor",
 		Model:        "Mock Chassis 1U",
 		SerialNumber: "MOCK-CHASSIS-123",
 		PartNumber:   "MOCK-CHS-001",
@@ -272,7 +320,7 @@ func getManagersCollection(w http.ResponseWriter, r *http.Request) {
 func getManager(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	managerID := vars["id"]
-	
+
 	manager := Manager{
 		ODataContext:    "/redfish/v1/$metadata#Manager.Manager",
 		ODataType:       "#Manager.v1_19_0.Manager",
@@ -325,9 +373,9 @@ func getFirmwareInventoryCollection(w http.ResponseWriter, r *http.Request) {
 func getFirmwareInventoryItem(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	itemID := vars["id"]
-	
+
 	var inventory SoftwareInventory
-	
+
 	switch itemID {
 	case "BIOS":
 		inventory = SoftwareInventory{
@@ -369,7 +417,7 @@ func getFirmwareInventoryItem(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	
+
 	jsonResponse(w, inventory)
 }
 
@@ -378,18 +426,18 @@ func simpleUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	var req SimpleUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
-	
+
 	if req.ImageURI == "" {
 		http.Error(w, "ImageURI is required", http.StatusBadRequest)
 		return
 	}
-	
+
 	// Mock response - in a real implementation, this would start an update task
 	response := map[string]interface{}{
 		"@Message.ExtendedInfo": []map[string]interface{}{
@@ -400,48 +448,136 @@ func simpleUpdate(w http.ResponseWriter, r *http.Request) {
 			},
 		},
 	}
-	
+
 	w.Header().Set("Location", "/redfish/v1/TaskService/Tasks/1")
 	w.WriteHeader(http.StatusAccepted)
 	jsonResponse(w, response)
 }
 
+func getLicenseService(w http.ResponseWriter, r *http.Request) {
+	licenseService := LicenseService{
+		ODataContext: "/redfish/v1/$metadata#LicenseService.LicenseService",
+		ODataType:    "#LicenseService.v1_1_0.LicenseService",
+		ODataID:      "/redfish/v1/LicenseService",
+		ID:           "LicenseService",
+		Name:         "License Service",
+		Licenses:     Link{ODataID: "/redfish/v1/LicenseService/Licenses"},
+		Status:       Status{State: "Enabled", Health: "OK"},
+	}
+	jsonResponse(w, licenseService)
+}
+
+func getLicensesCollection(w http.ResponseWriter, r *http.Request) {
+	collection := Collection{
+		ODataContext: "/redfish/v1/$metadata#LicenseCollection.LicenseCollection",
+		ODataType:    "#LicenseCollection.LicenseCollection",
+		ODataID:      "/redfish/v1/LicenseService/Licenses",
+		Name:         "License Collection",
+		MembersCount: 2,
+		Members: []Link{
+			{ODataID: "/redfish/v1/LicenseService/Licenses/BMC-License"},
+			{ODataID: "/redfish/v1/LicenseService/Licenses/BIOS-License"},
+		},
+	}
+	jsonResponse(w, collection)
+}
+
+func getLicense(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	licenseID := vars["id"]
+
+	var license License
+
+	switch licenseID {
+	case "BMC-License":
+		license = License{
+			ODataContext:       "/redfish/v1/$metadata#License.License",
+			ODataType:          "#License.v1_1_0.License",
+			ODataID:            "/redfish/v1/LicenseService/Licenses/BMC-License",
+			ID:                 "BMC-License",
+			Name:               "BMC Management License",
+			LicenseType:        "Production",
+			LicenseOrigin:      "BuiltIn",
+			InstallDate:        "2024-01-15T08:00:00Z",
+			ExpirationDate:     "2026-01-15T08:00:00Z",
+			MaxAuthorizedCount: 1,
+			RemainingUseCount:  1,
+			Status:             Status{State: "Enabled", Health: "OK"},
+			Manufacturer:       "Mock Vendor Corporation",
+			PartNumber:         "BMC-LIC-001",
+			SerialNumber:       "BMC123456789",
+			SKU:                "BMC-PROD-LIC",
+			Links:              struct{}{},
+		}
+	case "BIOS-License":
+		license = License{
+			ODataContext:  "/redfish/v1/$metadata#License.License",
+			ODataType:     "#License.v1_1_0.License",
+			ODataID:       "/redfish/v1/LicenseService/Licenses/BIOS-License",
+			ID:            "BIOS-License",
+			Name:          "BIOS Feature License",
+			LicenseType:   "Production",
+			LicenseOrigin: "BuiltIn",
+			InstallDate:   "2024-01-15T08:00:00Z",
+			Status:        Status{State: "Enabled", Health: "OK"},
+			Manufacturer:  "Mock Vendor Corporation",
+			PartNumber:    "BIOS-LIC-001",
+			SerialNumber:  "BIOS123456789",
+			SKU:           "BIOS-PROD-LIC",
+			Links:         struct{}{},
+		}
+	default:
+		http.NotFound(w, r)
+		return
+	}
+
+	jsonResponse(w, license)
+}
+
 func main() {
 	port := flag.String("port", "8080", "Port to listen on")
 	flag.Parse()
-	
+
 	r := mux.NewRouter()
-	
-	// Apply basic auth to all routes
-	r.Use(basicAuth)
-	
-	// Service root
+
+	// Public endpoints (no auth required)
 	r.HandleFunc("/redfish/v1/", getServiceRoot).Methods("GET")
 	r.HandleFunc("/redfish/v1", getServiceRoot).Methods("GET")
-	
-	// Systems endpoints
-	r.HandleFunc("/redfish/v1/Systems", getSystemsCollection).Methods("GET")
-	r.HandleFunc("/redfish/v1/Systems/", getSystemsCollection).Methods("GET")
-	r.HandleFunc("/redfish/v1/Systems/{id}", getSystem).Methods("GET")
-	
-	// Chassis endpoints
-	r.HandleFunc("/redfish/v1/Chassis", getChassisCollection).Methods("GET")
-	r.HandleFunc("/redfish/v1/Chassis/", getChassisCollection).Methods("GET")
-	r.HandleFunc("/redfish/v1/Chassis/{id}", getChassis).Methods("GET")
-	
-	// Managers endpoints
 	r.HandleFunc("/redfish/v1/Managers", getManagersCollection).Methods("GET")
 	r.HandleFunc("/redfish/v1/Managers/", getManagersCollection).Methods("GET")
-	r.HandleFunc("/redfish/v1/Managers/{id}", getManager).Methods("GET")
-	
+
+	// Protected endpoints (require auth)
+	protected := r.PathPrefix("/redfish/v1").Subrouter()
+	protected.Use(basicAuth)
+
+	// Systems endpoints
+	protected.HandleFunc("/Systems", getSystemsCollection).Methods("GET")
+	protected.HandleFunc("/Systems/", getSystemsCollection).Methods("GET")
+	protected.HandleFunc("/Systems/{id}", getSystem).Methods("GET")
+
+	// Chassis endpoints
+	protected.HandleFunc("/Chassis", getChassisCollection).Methods("GET")
+	protected.HandleFunc("/Chassis/", getChassisCollection).Methods("GET")
+	protected.HandleFunc("/Chassis/{id}", getChassis).Methods("GET")
+
+	// Manager individual endpoints (still protected)
+	protected.HandleFunc("/Managers/{id}", getManager).Methods("GET")
+
 	// UpdateService endpoints
-	r.HandleFunc("/redfish/v1/UpdateService", getUpdateService).Methods("GET")
-	r.HandleFunc("/redfish/v1/UpdateService/", getUpdateService).Methods("GET")
-	r.HandleFunc("/redfish/v1/UpdateService/FirmwareInventory", getFirmwareInventoryCollection).Methods("GET")
-	r.HandleFunc("/redfish/v1/UpdateService/FirmwareInventory/", getFirmwareInventoryCollection).Methods("GET")
-	r.HandleFunc("/redfish/v1/UpdateService/FirmwareInventory/{id}", getFirmwareInventoryItem).Methods("GET")
-	r.HandleFunc("/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate", simpleUpdate).Methods("POST")
-	
+	protected.HandleFunc("/UpdateService", getUpdateService).Methods("GET")
+	protected.HandleFunc("/UpdateService/", getUpdateService).Methods("GET")
+	protected.HandleFunc("/UpdateService/FirmwareInventory", getFirmwareInventoryCollection).Methods("GET")
+	protected.HandleFunc("/UpdateService/FirmwareInventory/", getFirmwareInventoryCollection).Methods("GET")
+	protected.HandleFunc("/UpdateService/FirmwareInventory/{id}", getFirmwareInventoryItem).Methods("GET")
+	protected.HandleFunc("/UpdateService/Actions/UpdateService.SimpleUpdate", simpleUpdate).Methods("POST")
+
+	// LicenseService endpoints
+	protected.HandleFunc("/LicenseService", getLicenseService).Methods("GET")
+	protected.HandleFunc("/LicenseService/", getLicenseService).Methods("GET")
+	protected.HandleFunc("/LicenseService/Licenses", getLicensesCollection).Methods("GET")
+	protected.HandleFunc("/LicenseService/Licenses/", getLicensesCollection).Methods("GET")
+	protected.HandleFunc("/LicenseService/Licenses/{id}", getLicense).Methods("GET")
+
 	// Handle trailing slashes
 	r.PathPrefix("/").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/" {
@@ -451,8 +587,8 @@ func main() {
 		}
 		http.NotFound(w, r)
 	})
-	
-	addr := fmt.Sprintf(":%s", *port)
+
+	addr := fmt.Sprintf("10.0.0.22:%s", *port)
 	log.Printf("Starting RedFish Mock Server on %s", addr)
 	log.Println("Default credentials: admin / password")
 	log.Fatal(http.ListenAndServe(addr, r))
