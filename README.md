@@ -41,7 +41,7 @@ A lightweight Go HTTP server that implements a mock RedFish API, providing endpo
 
    ```bash
    go build
-   ./redfish_api_mock
+   ./redfish_api_mock -host localhost -port 8080
    ```
 
 4. **Server starts on port 8080**
@@ -138,12 +138,6 @@ curl -u admin:password -X POST \
 
 - `main.go` - Single file containing all server logic and data structures
 - `go.mod` - Go module definition with gorilla/mux dependency
-
-### Testing
-
-```bash
-go test ./...
-```
 
 ### Building
 
