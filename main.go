@@ -568,7 +568,7 @@ func main() {
 	protected.GET("/LicenseService/Licenses/:id", getLicense)
 
 	addr := *host + ":" + *port
-	log.Printf("Starting RedFish Mock Server on %s", addr)
-	log.Println("Default credentials: admin / password")
+	log.Printf("\nStarting RedFish Mock Server on %s", addr)
+	log.Println("\nDefault credentials: admin / password")
 	log.Fatal(r.Run(addr))
 }
