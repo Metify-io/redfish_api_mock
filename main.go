@@ -106,7 +106,7 @@ type UpdateService struct {
 	ID                string               `json:"Id"`
 	Name              string               `json:"Name"`
 	ServiceEnabled    bool                 `json:"ServiceEnabled"`
-	HttpPushUri       string               `json:"HttpPushUri"`
+	HTTPPushURI       string               `json:"HTTPPushURI"`
 	FirmwareInventory Link                 `json:"FirmwareInventory"`
 	Actions           UpdateServiceActions `json:"Actions"`
 	Status            Status               `json:"Status"`
@@ -332,7 +332,7 @@ func getUpdateService(c *gin.Context) {
 		ID:                "UpdateService",
 		Name:              "Update Service",
 		ServiceEnabled:    true,
-		HttpPushUri:       "/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate",
+		HTTPPushURI:       "/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate",
 		FirmwareInventory: Link{ODataID: "/redfish/v1/UpdateService/FirmwareInventory"},
 		Actions: UpdateServiceActions{
 			SimpleUpdate: UpdateServiceSimpleUpdate{
@@ -426,8 +426,8 @@ func simpleUpdate(c *gin.Context) {
 	}
 
 	// Mock response - in a real implementation, this would start an update task
-	response := map[string]interface{}{
-		"@Message.ExtendedInfo": []map[string]interface{}{
+	response := map[string]any{
+		"@Message.ExtendedInfo": []map[string]any{
 			{
 				"MessageId": "Update.1.0.0.UpdateInProgress",
 				"Message":   "The update operation has been started and is in progress.",
