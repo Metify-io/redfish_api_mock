@@ -4,6 +4,8 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -56,6 +58,26 @@ type ComputerSystem struct {
 	ProcessorSummary ProcessorSummary `json:"ProcessorSummary"`
 	MemorySummary    MemorySummary    `json:"MemorySummary"`
 	Status           Status           `json:"Status"`
+	Boot             Boot             `json:"Boot"`
+	Actions          SystemActions    `json:"Actions"`
+	Oem              map[string]any   `json:"Oem"`
+}
+
+type Boot struct {
+	BootSourceOverrideEnabled          string   `json:"BootSourceOverrideEnabled"`
+	BootSourceOverrideTarget           string   `json:"BootSourceOverrideTarget"`
+	BootSourceOverrideMode             string   `json:"BootSourceOverrideMode"`
+	BootSourceOverrideEnabledAllowable []string `json:"BootSourceOverrideEnabled@Redfish.AllowableValues"`
+	BootSourceOverrideTargetAllowable  []string `json:"BootSourceOverrideTarget@Redfish.AllowableValues"`
+}
+
+type SystemActions struct {
+	Reset ResetAction `json:"#ComputerSystem.Reset"`
+}
+
+type ResetAction struct {
+	Target          string   `json:"target"`
+	AllowableValues []string `json:"ResetType@Redfish.AllowableValues"`
 }
 
 type ProcessorSummary struct {
@@ -97,6 +119,70 @@ type Manager struct {
 	ManagerType     string `json:"ManagerType"`
 	FirmwareVersion string `json:"FirmwareVersion"`
 	Status          Status `json:"Status"`
+	VirtualMedia    Link   `json:"VirtualMedia"`
+}
+
+type VirtualMedia struct {
+	ODataContext   string              `json:"@odata.context"`
+	ODataType      string              `json:"@odata.type"`
+	ODataID        string              `json:"@odata.id"`
+	ID             string              `json:"Id"`
+	Name           string              `json:"Name"`
+	MediaTypes     []string            `json:"MediaTypes"`
+	Image          *string             `json:"Image"`
+	Inserted       bool                `json:"Inserted"`
+	ConnectedVia   string              `json:"ConnectedVia"`
+	WriteProtected bool                `json:"WriteProtected"`
+	Actions        VirtualMediaActions `json:"Actions"`
+}
+
+type VirtualMediaActions struct {
+	InsertMedia VirtualMediaAction `json:"#VirtualMedia.InsertMedia"`
+	EjectMedia  VirtualMediaAction `json:"#VirtualMedia.EjectMedia"`
+}
+
+type VirtualMediaAction struct {
+	Target string `json:"target"`
+}
+
+type InsertMediaRequest struct {
+	Image          string `json:"Image"`
+	Inserted       *bool  `json:"Inserted,omitempty"`
+	WriteProtected *bool  `json:"WriteProtected,omitempty"`
+	UserName       string `json:"UserName,omitempty"`
+	Password       string `json:"Password,omitempty"`
+}
+
+type SystemPatchRequest struct {
+	Boot *struct {
+		BootSourceOverrideEnabled *string `json:"BootSourceOverrideEnabled"`
+		BootSourceOverrideTarget  *string `json:"BootSourceOverrideTarget"`
+		BootSourceOverrideMode    *string `json:"BootSourceOverrideMode"`
+	} `json:"Boot"`
+}
+
+type ResetRequest struct {
+	ResetType string `json:"ResetType"`
+}
+
+type mockServerState struct {
+	sync.RWMutex
+	image                     string
+	inserted                  bool
+	writeProtected            bool
+	bootSourceOverrideEnabled string
+	bootSourceOverrideTarget  string
+	bootSourceOverrideMode    string
+	installationStatus        string
+	installationStartedAt     time.Time
+}
+
+var mockState = mockServerState{
+	writeProtected:            true,
+	bootSourceOverrideEnabled: "Disabled",
+	bootSourceOverrideTarget:  "None",
+	bootSourceOverrideMode:    "UEFI",
+	installationStatus:        "Ready",
 }
 
 type UpdateService struct {
@@ -229,6 +315,16 @@ func getSystem(c *gin.Context) {
 	c.Header("OData-Version", "4.0")
 	systemID := c.Param("id")
 
+	mockState.Lock()
+	if mockState.installationStatus == "Installing" && time.Since(mockState.installationStartedAt) >= 2*time.Second {
+		mockState.installationStatus = "Installed"
+	}
+	bootEnabled := mockState.bootSourceOverrideEnabled
+	bootTarget := mockState.bootSourceOverrideTarget
+	bootMode := mockState.bootSourceOverrideMode
+	installationStatus := mockState.installationStatus
+	mockState.Unlock()
+
 	system := ComputerSystem{
 		ODataContext: "/redfish/v1/$metadata#ComputerSystem.ComputerSystem",
 		ODataType:    "#ComputerSystem.v1_22_0.ComputerSystem",
@@ -252,8 +348,103 @@ func getSystem(c *gin.Context) {
 			Status:               Status{State: "Enabled", Health: "OK"},
 		},
 		Status: Status{State: "Enabled", Health: "OK"},
+		Boot: Boot{
+			BootSourceOverrideEnabled:          bootEnabled,
+			BootSourceOverrideTarget:           bootTarget,
+			BootSourceOverrideMode:             bootMode,
+			BootSourceOverrideEnabledAllowable: []string{"Disabled", "Once", "Continuous"},
+			BootSourceOverrideTargetAllowable:  []string{"None", "Cd", "Hdd", "Pxe", "Usb"},
+		},
+		Actions: SystemActions{
+			Reset: ResetAction{
+				Target:          "/redfish/v1/Systems/" + systemID + "/Actions/ComputerSystem.Reset",
+				AllowableValues: []string{"On", "ForceOff", "GracefulShutdown", "GracefulRestart", "ForceRestart", "PowerCycle"},
+			},
+		},
+		Oem: map[string]any{
+			"MockVendor": map[string]any{
+				"InstallationStatus": installationStatus,
+			},
+		},
 	}
 	c.JSON(http.StatusOK, system)
+}
+
+func patchSystem(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
+	var req SystemPatchRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.Boot == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "A valid Boot object is required"})
+		return
+	}
+
+	mockState.Lock()
+	defer mockState.Unlock()
+	bootEnabled := mockState.bootSourceOverrideEnabled
+	bootTarget := mockState.bootSourceOverrideTarget
+	bootMode := mockState.bootSourceOverrideMode
+
+	if req.Boot.BootSourceOverrideEnabled != nil {
+		switch *req.Boot.BootSourceOverrideEnabled {
+		case "Disabled", "Once", "Continuous":
+			bootEnabled = *req.Boot.BootSourceOverrideEnabled
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported BootSourceOverrideEnabled value"})
+			return
+		}
+	}
+	if req.Boot.BootSourceOverrideTarget != nil {
+		switch *req.Boot.BootSourceOverrideTarget {
+		case "None", "Cd", "Hdd", "Pxe", "Usb":
+			bootTarget = *req.Boot.BootSourceOverrideTarget
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported BootSourceOverrideTarget value"})
+			return
+		}
+	}
+	if req.Boot.BootSourceOverrideMode != nil {
+		switch *req.Boot.BootSourceOverrideMode {
+		case "UEFI", "Legacy":
+			bootMode = *req.Boot.BootSourceOverrideMode
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported BootSourceOverrideMode value"})
+			return
+		}
+	}
+	mockState.bootSourceOverrideEnabled = bootEnabled
+	mockState.bootSourceOverrideTarget = bootTarget
+	mockState.bootSourceOverrideMode = bootMode
+
+	c.Status(http.StatusNoContent)
+}
+
+func resetSystem(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
+	var req ResetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
+		return
+	}
+
+	switch req.ResetType {
+	case "On", "ForceOff", "GracefulShutdown", "GracefulRestart", "ForceRestart", "PowerCycle":
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported ResetType value"})
+		return
+	}
+
+	mockState.Lock()
+	defer mockState.Unlock()
+	bootsSystem := req.ResetType == "On" || req.ResetType == "GracefulRestart" || req.ResetType == "ForceRestart" || req.ResetType == "PowerCycle"
+	if bootsSystem && mockState.inserted && mockState.bootSourceOverrideTarget == "Cd" && mockState.bootSourceOverrideEnabled != "Disabled" {
+		mockState.installationStatus = "Installing"
+		mockState.installationStartedAt = time.Now()
+		if mockState.bootSourceOverrideEnabled == "Once" {
+			mockState.bootSourceOverrideEnabled = "Disabled"
+		}
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 func getChassisCollection(c *gin.Context) {
@@ -319,8 +510,120 @@ func getManager(c *gin.Context) {
 		ManagerType:     "BMC",
 		FirmwareVersion: "1.0.0",
 		Status:          Status{State: "Enabled", Health: "OK"},
+		VirtualMedia:    Link{ODataID: "/redfish/v1/Managers/" + managerID + "/VirtualMedia"},
 	}
 	c.JSON(http.StatusOK, manager)
+}
+
+func getVirtualMediaCollection(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
+	managerID := c.Param("id")
+	collection := Collection{
+		ODataContext: "/redfish/v1/$metadata#VirtualMediaCollection.VirtualMediaCollection",
+		ODataType:    "#VirtualMediaCollection.VirtualMediaCollection",
+		ODataID:      "/redfish/v1/Managers/" + managerID + "/VirtualMedia",
+		Name:         "Virtual Media Collection",
+		MembersCount: 1,
+		Members: []Link{
+			{ODataID: "/redfish/v1/Managers/" + managerID + "/VirtualMedia/CD"},
+		},
+	}
+	c.JSON(http.StatusOK, collection)
+}
+
+func getVirtualMedia(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
+	if c.Param("mediaID") != "CD" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Virtual media device not found"})
+		return
+	}
+
+	managerID := c.Param("id")
+	baseURI := "/redfish/v1/Managers/" + managerID + "/VirtualMedia/CD"
+	mockState.RLock()
+	var image *string
+	if mockState.image != "" {
+		imageValue := mockState.image
+		image = &imageValue
+	}
+	inserted := mockState.inserted
+	writeProtected := mockState.writeProtected
+	mockState.RUnlock()
+
+	connectedVia := "NotConnected"
+	if inserted {
+		connectedVia = "URI"
+	}
+	media := VirtualMedia{
+		ODataContext:   "/redfish/v1/$metadata#VirtualMedia.VirtualMedia",
+		ODataType:      "#VirtualMedia.v1_6_0.VirtualMedia",
+		ODataID:        baseURI,
+		ID:             "CD",
+		Name:           "Virtual CD/DVD",
+		MediaTypes:     []string{"CD", "DVD"},
+		Image:          image,
+		Inserted:       inserted,
+		ConnectedVia:   connectedVia,
+		WriteProtected: writeProtected,
+		Actions: VirtualMediaActions{
+			InsertMedia: VirtualMediaAction{Target: baseURI + "/Actions/VirtualMedia.InsertMedia"},
+			EjectMedia:  VirtualMediaAction{Target: baseURI + "/Actions/VirtualMedia.EjectMedia"},
+		},
+	}
+	c.JSON(http.StatusOK, media)
+}
+
+func insertMedia(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
+	if c.Param("mediaID") != "CD" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Virtual media device not found"})
+		return
+	}
+
+	var req InsertMediaRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.Image == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Image is required"})
+		return
+	}
+
+	inserted := true
+	if req.Inserted != nil {
+		inserted = *req.Inserted
+	}
+	writeProtected := true
+	if req.WriteProtected != nil {
+		writeProtected = *req.WriteProtected
+	}
+
+	mockState.Lock()
+	mockState.image = req.Image
+	mockState.inserted = inserted
+	mockState.writeProtected = writeProtected
+	if inserted {
+		mockState.installationStatus = "MediaMounted"
+	}
+	mockState.Unlock()
+
+	c.Status(http.StatusNoContent)
+}
+
+func ejectMedia(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
+	if c.Param("mediaID") != "CD" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Virtual media device not found"})
+		return
+	}
+
+	mockState.Lock()
+	mockState.image = ""
+	mockState.inserted = false
+	mockState.writeProtected = true
+	if mockState.installationStatus != "Installed" {
+		mockState.installationStatus = "Ready"
+	}
+	mockState.Unlock()
+
+	c.Status(http.StatusNoContent)
 }
 
 func getUpdateService(c *gin.Context) {
@@ -543,6 +846,8 @@ func main() {
 	protected.GET("/Systems", getSystemsCollection)
 	protected.GET("/Systems/", getSystemsCollection)
 	protected.GET("/Systems/:id", getSystem)
+	protected.PATCH("/Systems/:id", patchSystem)
+	protected.POST("/Systems/:id/Actions/ComputerSystem.Reset", resetSystem)
 
 	// Chassis endpoints
 	protected.GET("/Chassis", getChassisCollection)
@@ -551,6 +856,11 @@ func main() {
 
 	// Manager individual endpoints (still protected)
 	protected.GET("/Managers/:id", getManager)
+	protected.GET("/Managers/:id/VirtualMedia", getVirtualMediaCollection)
+	protected.GET("/Managers/:id/VirtualMedia/", getVirtualMediaCollection)
+	protected.GET("/Managers/:id/VirtualMedia/:mediaID", getVirtualMedia)
+	protected.POST("/Managers/:id/VirtualMedia/:mediaID/Actions/VirtualMedia.InsertMedia", insertMedia)
+	protected.POST("/Managers/:id/VirtualMedia/:mediaID/Actions/VirtualMedia.EjectMedia", ejectMedia)
 
 	// UpdateService endpoints
 	protected.GET("/UpdateService", getUpdateService)

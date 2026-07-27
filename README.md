@@ -8,6 +8,7 @@ A lightweight Go HTTP server that implements a mock RedFish API, providing endpo
 - **Basic Authentication** - Default credentials: `admin` / `password`
 - **Core Resource Collections** - Systems, Chassis, Managers, and UpdateService endpoints
 - **Firmware Management** - Mock firmware inventory and update operations
+- **Virtual Media OS Installation** - Stateful ISO mounting, one-time CD boot, and reset workflow
 - **OData Annotations** - Proper JSON responses with RedFish OData context
 
 ## Quick Start
@@ -69,6 +70,8 @@ curl -u admin:password http://localhost:8080/redfish/v1/ | jq
 
 - `GET /redfish/v1/Systems` - Collection of computer systems
 - `GET /redfish/v1/Systems/{id}` - Individual computer system details
+- `PATCH /redfish/v1/Systems/{id}` - Configure boot source override
+- `POST /redfish/v1/Systems/{id}/Actions/ComputerSystem.Reset` - Reset the system
 
 ### Chassis
 
@@ -79,6 +82,10 @@ curl -u admin:password http://localhost:8080/redfish/v1/ | jq
 
 - `GET /redfish/v1/Managers` - Collection of managers
 - `GET /redfish/v1/Managers/{id}` - Individual manager details
+- `GET /redfish/v1/Managers/{id}/VirtualMedia` - Virtual media collection
+- `GET /redfish/v1/Managers/{id}/VirtualMedia/CD` - Virtual CD/DVD state
+- `POST /redfish/v1/Managers/{id}/VirtualMedia/CD/Actions/VirtualMedia.InsertMedia` - Mount an ISO
+- `POST /redfish/v1/Managers/{id}/VirtualMedia/CD/Actions/VirtualMedia.EjectMedia` - Unmount the ISO
 
 ### Update Service
 
@@ -131,6 +138,36 @@ curl -u admin:password -X POST \
   -d '{"ImageURI": "https://example.com/firmware.bin"}' \
   http://localhost:8080/redfish/v1/UpdateService/Actions/UpdateService.SimpleUpdate
 ```
+
+### Perform a Mock OS Installation
+
+Mount an OS ISO:
+
+```bash
+curl -u admin:password -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"Image":"https://example.com/os.iso","Inserted":true,"WriteProtected":true}' \
+  http://localhost:8080/redfish/v1/Managers/1/VirtualMedia/CD/Actions/VirtualMedia.InsertMedia
+```
+
+Configure a one-time boot from the virtual CD and restart the system:
+
+```bash
+curl -u admin:password -X PATCH \
+  -H "Content-Type: application/json" \
+  -d '{"Boot":{"BootSourceOverrideEnabled":"Once","BootSourceOverrideTarget":"Cd"}}' \
+  http://localhost:8080/redfish/v1/Systems/1
+
+curl -u admin:password -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"ResetType":"ForceRestart"}' \
+  http://localhost:8080/redfish/v1/Systems/1/Actions/ComputerSystem.Reset
+```
+
+The mock installation status is exposed at
+`Oem.MockVendor.InstallationStatus` on `GET /redfish/v1/Systems/1`. It transitions
+from `Ready` to `MediaMounted`, then `Installing` after the reset, and `Installed`
+after two seconds. All state is in memory and resets when the server restarts.
 
 ## Development
 
