@@ -1,9 +1,16 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"flag"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"os"
 	"sync"
 	"time"
 
@@ -184,6 +191,11 @@ var mockState = mockServerState{
 	bootSourceOverrideMode:    "UEFI",
 	installationStatus:        "Ready",
 }
+
+var (
+	errInvalidISO = errors.New("invalid ISO image")
+	isoHTTPClient = &http.Client{Timeout: 30 * time.Minute}
+)
 
 type UpdateService struct {
 	ODataContext      string               `json:"@odata.context"`
@@ -573,6 +585,72 @@ func getVirtualMedia(c *gin.Context) {
 	c.JSON(http.StatusOK, media)
 }
 
+func downloadAndValidateISO(ctx context.Context, imageURL, username, password string) error {
+	parsedURL, err := url.ParseRequestURI(imageURL)
+	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") || parsedURL.Host == "" {
+		return fmt.Errorf("%w: Image must be an HTTP or HTTPS URL", errInvalidISO)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
+	if err != nil {
+		return fmt.Errorf("create image request: %w", err)
+	}
+	if username != "" || password != "" {
+		req.SetBasicAuth(username, password)
+	}
+
+	response, err := isoHTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("download image: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("download image: server returned %s", response.Status)
+	}
+
+	image, err := os.CreateTemp("", "redfish-virtual-media-*.iso")
+	if err != nil {
+		return fmt.Errorf("create temporary image: %w", err)
+	}
+	defer os.Remove(image.Name())
+	defer image.Close()
+
+	size, err := io.Copy(image, response.Body)
+	if err != nil {
+		return fmt.Errorf("download image: %w", err)
+	}
+	if err := validateISO(image, size); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateISO(image *os.File, size int64) error {
+	const (
+		sectorSize            = int64(2048)
+		firstDescriptorSector = int64(16)
+		primaryDescriptor     = byte(1)
+		terminatingDescriptor = byte(255)
+	)
+
+	header := make([]byte, 7)
+	for sector := firstDescriptorSector; sector*sectorSize+int64(len(header)) <= size; sector++ {
+		if _, err := image.ReadAt(header, sector*sectorSize); err != nil {
+			return fmt.Errorf("%w: cannot read volume descriptor: %v", errInvalidISO, err)
+		}
+		if !bytes.Equal(header[1:6], []byte("CD001")) || header[6] != 1 {
+			return fmt.Errorf("%w: ISO-9660 volume descriptor not found", errInvalidISO)
+		}
+		switch header[0] {
+		case primaryDescriptor:
+			return nil
+		case terminatingDescriptor:
+			return fmt.Errorf("%w: primary volume descriptor not found", errInvalidISO)
+		}
+	}
+	return fmt.Errorf("%w: image is too small or has no primary volume descriptor", errInvalidISO)
+}
+
 func insertMedia(c *gin.Context) {
 	c.Header("OData-Version", "4.0")
 	if c.Param("mediaID") != "CD" {
@@ -593,6 +671,14 @@ func insertMedia(c *gin.Context) {
 	writeProtected := true
 	if req.WriteProtected != nil {
 		writeProtected = *req.WriteProtected
+	}
+	if err := downloadAndValidateISO(c.Request.Context(), req.Image, req.UserName, req.Password); err != nil {
+		status := http.StatusBadGateway
+		if errors.Is(err, errInvalidISO) {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
+		return
 	}
 
 	mockState.Lock()

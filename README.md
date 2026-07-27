@@ -150,6 +150,12 @@ curl -u admin:password -X POST \
   http://localhost:8080/redfish/v1/Managers/1/VirtualMedia/CD/Actions/VirtualMedia.InsertMedia
 ```
 
+The insert operation downloads the complete image (using `UserName` and `Password`
+as HTTP Basic credentials when supplied) and verifies that it contains a valid
+ISO-9660 primary volume descriptor. The media is only mounted after validation;
+an invalid image returns `400 Bad Request`, while a download failure returns
+`502 Bad Gateway`.
+
 Configure a one-time boot from the virtual CD and restart the system:
 
 ```bash
