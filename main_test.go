@@ -7,10 +7,66 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 )
+
+func TestOEMProfiles(t *testing.T) {
+	tests := []struct {
+		name           string
+		vendor         string
+		manufacturer   string
+		systemID       string
+		managerID      string
+		virtualMediaID string
+		oemKey         string
+	}{
+		{name: "mock", vendor: "Mock Vendor Corporation", manufacturer: "MetifyIO", systemID: "1", managerID: "1", virtualMediaID: "CD", oemKey: "MockVendor"},
+		{name: "supermicro", vendor: "Supermicro", manufacturer: "Supermicro", systemID: "1", managerID: "1", virtualMediaID: "CD1", oemKey: "Supermicro"},
+		{name: "dell", vendor: "Dell Inc.", manufacturer: "Dell Inc.", systemID: "System.Embedded.1", managerID: "iDRAC.Embedded.1", virtualMediaID: "CD", oemKey: "Dell"},
+		{name: "cisco", vendor: "Cisco Systems Inc.", manufacturer: "Cisco Systems Inc.", systemID: "1", managerID: "CIMC", virtualMediaID: "CD", oemKey: "Cisco"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.json")
+			if err := os.WriteFile(path, []byte(`{"oem":"`+test.name+`"}`), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			loaded, err := loadConfig(path)
+			if err != nil {
+				t.Fatalf("loadConfig() error = %v", err)
+			}
+			if loaded.ServiceRoot.Vendor != test.vendor || loaded.System.Manufacturer != test.manufacturer {
+				t.Fatalf("profile identity = %q, %q", loaded.ServiceRoot.Vendor, loaded.System.Manufacturer)
+			}
+			if loaded.System.InstallationStatusOemKey != test.oemKey {
+				t.Fatalf("installation OEM key = %q, want %q", loaded.System.InstallationStatusOemKey, test.oemKey)
+			}
+
+			behavior, err := oemBehaviorFor(loaded.OEM)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ids := behavior.resourceIDs()
+			if ids.System != test.systemID || ids.Manager != test.managerID || ids.VirtualMedia != test.virtualMediaID {
+				t.Fatalf("resource IDs = %#v", ids)
+			}
+		})
+	}
+}
+
+func TestLoadConfigRejectsUnsupportedOEM(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"oem":"unknown"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadConfig(path); err == nil {
+		t.Fatal("loadConfig() succeeded for unsupported OEM")
+	}
+}
 
 func TestLoadConfigAndConfiguredResponses(t *testing.T) {
 	configFile, err := os.CreateTemp(t.TempDir(), "config-*.json")
