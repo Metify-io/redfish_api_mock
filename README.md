@@ -9,6 +9,7 @@ A lightweight Go HTTP server that implements a mock RedFish API, providing endpo
 - **Core Resource Collections** - Systems, Chassis, Managers, and UpdateService endpoints
 - **Firmware Management** - Mock firmware inventory and update operations
 - **Virtual Media OS Installation** - Stateful ISO mounting, one-time CD boot, and reset workflow
+- **OEM Profiles** - Mock, Supermicro, Dell, and Cisco identities and resource conventions
 - **OData Annotations** - Proper JSON responses with RedFish OData context
 
 ## Quick Start
@@ -110,16 +111,28 @@ in the `authentication` section of `config.json`:
 
 ## Mock Data
 
-Edit `config.json` to change the service root vendor and OEM extension, system,
-chassis, manager, and firmware inventory returned by the API. The server reads
-the file at startup, so restart it after making changes. Fields omitted from a
-custom config retain their built-in defaults. Unknown field names cause startup
-to fail, which helps catch configuration typos.
-
-For example, an OEM-specific system can be configured with:
+Set the top-level `oem` field in `config.json` to `mock`, `supermicro`, `dell`,
+or `cisco`. Each profile supplies that OEM's default identity, OEM extension,
+resource IDs, manager name, and virtual-media ID. The implementations live in
+separate `oem_*.go` files so more vendor-specific behavior can be added without
+changing the common endpoint handlers.
 
 ```json
 {
+  "oem": "dell"
+}
+```
+
+The server reads the file at startup, so restart it after making changes. Other
+configured fields override the selected profile's defaults; omitted fields
+retain those defaults. Unknown field names and unsupported OEM names cause
+startup to fail, which helps catch configuration typos.
+
+For example, a profile can still be customized with:
+
+```json
+{
+  "oem": "dell",
   "service_root": {
     "vendor": "Acme Corporation",
     "oem": {
@@ -141,8 +154,8 @@ For example, an OEM-specific system can be configured with:
 }
 ```
 
-The full checked-in `config.json` documents every supported setting and returns
-the original mock data by default, including:
+The checked-in `config.json.default` supplies common mock hardware data and uses
+the `mock` profile by default, preserving the original responses, including:
 
 - **Systems:** Mock Server X1000 with 2 CPUs, 64GB RAM
 - **Chassis:** 1U RackMount chassis
@@ -218,8 +231,10 @@ after two seconds. All state is in memory and resets when the server restarts.
 
 ### Project Structure
 
-- `main.go` - Single file containing all server logic and data structures
-- `go.mod` - Go module definition with gorilla/mux dependency
+- `main.go` - Common Redfish resources, handlers, and server setup
+- `oem.go` - OEM behavior interface and profile selection
+- `oem_*.go` - Mock, Supermicro, Dell, and Cisco behavior profiles
+- `go.mod` - Go module definition
 
 ### Building
 
