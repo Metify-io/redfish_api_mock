@@ -2,11 +2,76 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 )
+
+func TestLoadConfigAndConfiguredResponses(t *testing.T) {
+	configFile, err := os.CreateTemp(t.TempDir(), "config-*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = configFile.WriteString(`{
+		"service_root": {"vendor": "Acme", "oem": {"Acme": {"Feature": "Enabled"}}},
+		"system": {
+			"manufacturer": "Acme", "model": "Rack 42", "installation_status_oem_key": "Acme",
+			"oem": {"Acme": {"AssetTag": "lab-server"}}
+		},
+		"firmware_inventory": [
+			{"id": "CPLD", "name": "System CPLD", "version": "4.2", "updateable": true, "software_id": "CPLD-4.2"}
+		]
+	}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := configFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	loaded, err := loadConfig(configFile.Name())
+	if err != nil {
+		t.Fatalf("loadConfig() error = %v", err)
+	}
+	previousConfig := config
+	config = loaded
+	t.Cleanup(func() { config = previousConfig })
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Params = gin.Params{{Key: "id", Value: "1"}}
+	getSystem(ctx)
+
+	var system ComputerSystem
+	if err := json.Unmarshal(recorder.Body.Bytes(), &system); err != nil {
+		t.Fatalf("decode system response: %v", err)
+	}
+	if system.Manufacturer != "Acme" || system.Model != "Rack 42" {
+		t.Fatalf("configured system identity = %q %q", system.Manufacturer, system.Model)
+	}
+	acme, ok := system.Oem["Acme"].(map[string]any)
+	if !ok || acme["AssetTag"] != "lab-server" || acme["InstallationStatus"] != "Ready" {
+		t.Fatalf("configured system OEM = %#v", system.Oem)
+	}
+
+	recorder = httptest.NewRecorder()
+	ctx, _ = gin.CreateTestContext(recorder)
+	ctx.Params = gin.Params{{Key: "id", Value: "CPLD"}}
+	getFirmwareInventoryItem(ctx)
+	var firmware SoftwareInventory
+	if err := json.Unmarshal(recorder.Body.Bytes(), &firmware); err != nil {
+		t.Fatalf("decode firmware response: %v", err)
+	}
+	if firmware.ID != "CPLD" || firmware.Version != "4.2" {
+		t.Fatalf("configured firmware = %#v", firmware)
+	}
+}
 
 func TestDownloadAndValidateISO(t *testing.T) {
 	image := make([]byte, 18*2048)
