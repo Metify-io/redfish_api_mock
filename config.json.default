@@ -1,4 +1,8 @@
 {
+  "authentication": {
+    "username": "admin",
+    "password": "password"
+  },
   "service_root": {
     "uuid": "92384634-2938-2342-8820-489239905423",
     "product": "Mock RedFish Server v1.0",

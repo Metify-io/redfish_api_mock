@@ -18,6 +18,7 @@ func TestLoadConfigAndConfiguredResponses(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = configFile.WriteString(`{
+		"authentication": {"username": "bmc-user", "password": "bmc-secret"},
 		"service_root": {"vendor": "Acme", "oem": {"Acme": {"Feature": "Enabled"}}},
 		"system": {
 			"manufacturer": "Acme", "model": "Rack 42", "installation_status_oem_key": "Acme",
@@ -70,6 +71,17 @@ func TestLoadConfigAndConfiguredResponses(t *testing.T) {
 	}
 	if firmware.ID != "CPLD" || firmware.Version != "4.2" {
 		t.Fatalf("configured firmware = %#v", firmware)
+	}
+
+	router := gin.New()
+	router.Use(basicAuth())
+	router.GET("/protected", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	request := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	request.SetBasicAuth("bmc-user", "bmc-secret")
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("configured credentials status = %d, want %d", recorder.Code, http.StatusNoContent)
 	}
 }
 

@@ -105,11 +105,17 @@ type Status struct {
 }
 
 type Config struct {
-	ServiceRoot ServiceRootConfig    `json:"service_root"`
-	System      SystemConfig         `json:"system"`
-	Chassis     ChassisConfig        `json:"chassis"`
-	Manager     ManagerConfig        `json:"manager"`
-	Firmware    []FirmwareItemConfig `json:"firmware_inventory"`
+	Authentication AuthenticationConfig `json:"authentication"`
+	ServiceRoot    ServiceRootConfig    `json:"service_root"`
+	System         SystemConfig         `json:"system"`
+	Chassis        ChassisConfig        `json:"chassis"`
+	Manager        ManagerConfig        `json:"manager"`
+	Firmware       []FirmwareItemConfig `json:"firmware_inventory"`
+}
+
+type AuthenticationConfig struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 type ServiceRootConfig struct {
@@ -162,6 +168,10 @@ var config = defaultConfig()
 
 func defaultConfig() Config {
 	return Config{
+		Authentication: AuthenticationConfig{
+			Username: "admin",
+			Password: "password",
+		},
 		ServiceRoot: ServiceRootConfig{
 			UUID:    "92384634-2938-2342-8820-489239905423",
 			Product: "Mock RedFish Server v1.0",
@@ -234,6 +244,9 @@ func loadConfig(path string) (Config, error) {
 	}
 	if loaded.System.InstallationStatusOemKey == "" {
 		return Config{}, errors.New("system.installation_status_oem_key is required")
+	}
+	if loaded.Authentication.Username == "" || loaded.Authentication.Password == "" {
+		return Config{}, errors.New("authentication.username and authentication.password are required")
 	}
 	return loaded, nil
 }
@@ -406,7 +419,7 @@ type License struct {
 
 func basicAuth() gin.HandlerFunc {
 	return gin.BasicAuth(gin.Accounts{
-		"admin": "password",
+		config.Authentication.Username: config.Authentication.Password,
 	})
 }
 
@@ -1077,6 +1090,6 @@ func main() {
 
 	addr := *host + ":" + *port
 	log.Printf("\nStarting RedFish Mock Server on %s", addr)
-	log.Println("\nDefault credentials: admin / password")
+	log.Printf("\nBMC username: %s", config.Authentication.Username)
 	log.Fatal(r.Run(addr))
 }
