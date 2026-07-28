@@ -105,6 +105,7 @@ type Status struct {
 }
 
 type Config struct {
+	OEM            string               `json:"oem"`
 	Authentication AuthenticationConfig `json:"authentication"`
 	ServiceRoot    ServiceRootConfig    `json:"service_root"`
 	System         SystemConfig         `json:"system"`
@@ -167,52 +168,34 @@ type FirmwareItemConfig struct {
 var config = defaultConfig()
 
 func defaultConfig() Config {
-	return Config{
+	config := Config{
+		OEM: "mock",
 		Authentication: AuthenticationConfig{
 			Username: "admin",
 			Password: "password",
 		},
 		ServiceRoot: ServiceRootConfig{
-			UUID:    "92384634-2938-2342-8820-489239905423",
-			Product: "Mock RedFish Server v1.0",
-			Vendor:  "Mock Vendor Corporation",
-			Oem: map[string]any{
-				"Vendor": map[string]any{
-					"@odata.type":        "#MockVendorExtensions.v1_0_0.ServiceRoot",
-					"ServerModel":        "Mock Enterprise Server X1000",
-					"HardwareVersion":    "Rev 2.1",
-					"ManagementVersion":  "BMC 3.2.1",
-					"SupportContact":     "support@mockvendor.com",
-					"WarrantyStatus":     "Active",
-					"WarrantyExpiration": "2026-12-31",
-				},
-			},
+			UUID: "92384634-2938-2342-8820-489239905423",
 		},
 		System: SystemConfig{
-			Name:                     "System",
-			SystemType:               "Physical",
-			Manufacturer:             "MetifyIO",
-			Model:                    "Mock Server X1000",
-			SerialNumber:             "MOCK123456789",
-			PartNumber:               "MOCK-SRV-001",
-			PowerState:               "On",
-			BiosVersion:              "1.0.0",
-			ProcessorCount:           2,
-			ProcessorModel:           "Mock CPU X5000",
-			TotalSystemMemoryGiB:     64,
-			Oem:                      map[string]any{},
-			InstallationStatusOemKey: "MockVendor",
+			Name:                 "System",
+			SystemType:           "Physical",
+			SerialNumber:         "MOCK123456789",
+			PartNumber:           "MOCK-SRV-001",
+			PowerState:           "On",
+			BiosVersion:          "1.0.0",
+			ProcessorCount:       2,
+			ProcessorModel:       "Mock CPU X5000",
+			TotalSystemMemoryGiB: 64,
+			Oem:                  map[string]any{},
 		},
 		Chassis: ChassisConfig{
 			Name:         "Chassis",
 			ChassisType:  "RackMount",
-			Manufacturer: "Vendor",
-			Model:        "Mock Chassis 1U",
 			SerialNumber: "MOCK-CHASSIS-123",
 			PartNumber:   "MOCK-CHS-001",
 		},
 		Manager: ManagerConfig{
-			Name:            "Manager",
 			ManagerType:     "BMC",
 			FirmwareVersion: "1.0.0",
 		},
@@ -222,17 +205,30 @@ func defaultConfig() Config {
 			{ID: "NIC", Name: "Network Interface Controller", Version: "3.2.1", Updateable: true, SoftwareID: "NIC-3.2.1"},
 		},
 	}
+	mockOEM{}.applyDefaults(&config)
+	return config
 }
 
 func loadConfig(path string) (Config, error) {
-	loaded := defaultConfig()
-	file, err := os.Open(path)
+	contents, err := os.ReadFile(path)
 	if err != nil {
 		return Config{}, err
 	}
-	defer file.Close()
+	selection := struct {
+		OEM string `json:"oem"`
+	}{OEM: "mock"}
+	if err := json.Unmarshal(contents, &selection); err != nil {
+		return Config{}, fmt.Errorf("decode config: %w", err)
+	}
+	behavior, err := oemBehaviorFor(selection.OEM)
+	if err != nil {
+		return Config{}, err
+	}
+	loaded := defaultConfig()
+	loaded.OEM = behavior.name()
+	behavior.applyDefaults(&loaded)
 
-	decoder := json.NewDecoder(file)
+	decoder := json.NewDecoder(bytes.NewReader(contents))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&loaded); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
@@ -448,6 +444,7 @@ func getServiceRoot(c *gin.Context) {
 
 func getSystemsCollection(c *gin.Context) {
 	c.Header("OData-Version", "4.0")
+	ids := activeOEM().resourceIDs()
 	collection := Collection{
 		ODataContext: "/redfish/v1/$metadata#ComputerSystemCollection.ComputerSystemCollection",
 		ODataType:    "#ComputerSystemCollection.ComputerSystemCollection",
@@ -455,7 +452,7 @@ func getSystemsCollection(c *gin.Context) {
 		Name:         "Computer System Collection",
 		MembersCount: 1,
 		Members: []Link{
-			{ODataID: "/redfish/v1/Systems/1"},
+			{ODataID: "/redfish/v1/Systems/" + ids.System},
 		},
 	}
 	c.JSON(http.StatusOK, collection)
@@ -607,6 +604,7 @@ func resetSystem(c *gin.Context) {
 
 func getChassisCollection(c *gin.Context) {
 	c.Header("OData-Version", "4.0")
+	ids := activeOEM().resourceIDs()
 	collection := Collection{
 		ODataContext: "/redfish/v1/$metadata#ChassisCollection.ChassisCollection",
 		ODataType:    "#ChassisCollection.ChassisCollection",
@@ -614,7 +612,7 @@ func getChassisCollection(c *gin.Context) {
 		Name:         "Chassis Collection",
 		MembersCount: 1,
 		Members: []Link{
-			{ODataID: "/redfish/v1/Chassis/1"},
+			{ODataID: "/redfish/v1/Chassis/" + ids.Chassis},
 		},
 	}
 	c.JSON(http.StatusOK, collection)
@@ -642,6 +640,7 @@ func getChassis(c *gin.Context) {
 
 func getManagersCollection(c *gin.Context) {
 	c.Header("OData-Version", "4.0")
+	ids := activeOEM().resourceIDs()
 	collection := Collection{
 		ODataContext: "/redfish/v1/$metadata#ManagerCollection.ManagerCollection",
 		ODataType:    "#ManagerCollection.ManagerCollection",
@@ -649,7 +648,7 @@ func getManagersCollection(c *gin.Context) {
 		Name:         "Manager Collection",
 		MembersCount: 1,
 		Members: []Link{
-			{ODataID: "/redfish/v1/Managers/1"},
+			{ODataID: "/redfish/v1/Managers/" + ids.Manager},
 		},
 	}
 	c.JSON(http.StatusOK, collection)
@@ -676,6 +675,7 @@ func getManager(c *gin.Context) {
 func getVirtualMediaCollection(c *gin.Context) {
 	c.Header("OData-Version", "4.0")
 	managerID := c.Param("id")
+	mediaID := activeOEM().resourceIDs().VirtualMedia
 	collection := Collection{
 		ODataContext: "/redfish/v1/$metadata#VirtualMediaCollection.VirtualMediaCollection",
 		ODataType:    "#VirtualMediaCollection.VirtualMediaCollection",
@@ -683,7 +683,7 @@ func getVirtualMediaCollection(c *gin.Context) {
 		Name:         "Virtual Media Collection",
 		MembersCount: 1,
 		Members: []Link{
-			{ODataID: "/redfish/v1/Managers/" + managerID + "/VirtualMedia/CD"},
+			{ODataID: "/redfish/v1/Managers/" + managerID + "/VirtualMedia/" + mediaID},
 		},
 	}
 	c.JSON(http.StatusOK, collection)
@@ -691,13 +691,14 @@ func getVirtualMediaCollection(c *gin.Context) {
 
 func getVirtualMedia(c *gin.Context) {
 	c.Header("OData-Version", "4.0")
-	if c.Param("mediaID") != "CD" {
+	mediaID := activeOEM().resourceIDs().VirtualMedia
+	if c.Param("mediaID") != mediaID {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Virtual media device not found"})
 		return
 	}
 
 	managerID := c.Param("id")
-	baseURI := "/redfish/v1/Managers/" + managerID + "/VirtualMedia/CD"
+	baseURI := "/redfish/v1/Managers/" + managerID + "/VirtualMedia/" + mediaID
 	mockState.RLock()
 	var image *string
 	if mockState.image != "" {
@@ -716,7 +717,7 @@ func getVirtualMedia(c *gin.Context) {
 		ODataContext:   "/redfish/v1/$metadata#VirtualMedia.VirtualMedia",
 		ODataType:      "#VirtualMedia.v1_6_0.VirtualMedia",
 		ODataID:        baseURI,
-		ID:             "CD",
+		ID:             mediaID,
 		Name:           "Virtual CD/DVD",
 		MediaTypes:     []string{"CD", "DVD"},
 		Image:          image,
@@ -799,7 +800,7 @@ func validateISO(image *os.File, size int64) error {
 
 func insertMedia(c *gin.Context) {
 	c.Header("OData-Version", "4.0")
-	if c.Param("mediaID") != "CD" {
+	if c.Param("mediaID") != activeOEM().resourceIDs().VirtualMedia {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Virtual media device not found"})
 		return
 	}
@@ -841,7 +842,7 @@ func insertMedia(c *gin.Context) {
 
 func ejectMedia(c *gin.Context) {
 	c.Header("OData-Version", "4.0")
-	if c.Param("mediaID") != "CD" {
+	if c.Param("mediaID") != activeOEM().resourceIDs().VirtualMedia {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Virtual media device not found"})
 		return
 	}
@@ -998,7 +999,7 @@ func getLicense(c *gin.Context) {
 			MaxAuthorizedCount: 1,
 			RemainingUseCount:  1,
 			Status:             Status{State: "Enabled", Health: "OK"},
-			Manufacturer:       "Mock Vendor Corporation",
+			Manufacturer:       config.ServiceRoot.Vendor,
 			PartNumber:         "BMC-LIC-001",
 			SerialNumber:       "BMC123456789",
 			SKU:                "BMC-PROD-LIC",
@@ -1015,7 +1016,7 @@ func getLicense(c *gin.Context) {
 			LicenseOrigin: "BuiltIn",
 			InstallDate:   "2024-01-15T08:00:00Z",
 			Status:        Status{State: "Enabled", Health: "OK"},
-			Manufacturer:  "Mock Vendor Corporation",
+			Manufacturer:  config.ServiceRoot.Vendor,
 			PartNumber:    "BIOS-LIC-001",
 			SerialNumber:  "BIOS123456789",
 			SKU:           "BIOS-PROD-LIC",
