@@ -35,23 +35,20 @@ A lightweight Go HTTP server that implements a mock RedFish API, providing endpo
 3. **Build and run**
 
    ```bash
-   go run main.go
+   make run
    ```
 
-   Or build a binary:
+   `make run` creates `config.json` from `config.json.default` when needed and
+   preserves an existing `config.json`. Pass server arguments with `ARGS`:
 
    ```bash
-   go build
-   ./redfish_api_mock -host localhost -port 8080
+   make run ARGS="-host 10.0.0.209 -port 8040"
    ```
 
-   You will need to first rename `config.json.default` to `config.json`.
-   Mock identity and inventory values are loaded from `config.json`. To use a
-   different file:
+   To only build the executable:
 
    ```bash
-   cp config.json.default config.json
-   ./redfish_api_mock -config /path/to/my-config.json
+   make build
    ```
 
 4. **Server starts on port 8080**
@@ -226,7 +223,14 @@ after two seconds. All state is in memory and resets when the server restarts.
 ### Building
 
 ```bash
-go build
+make build
+```
+
+Create `dist/redfish_api_mock.tar.gz` containing the executable and the current
+`config.json`:
+
+```bash
+make package
 ```
 
 ## RedFish Compliance
