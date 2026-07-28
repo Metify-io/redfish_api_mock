@@ -45,10 +45,12 @@ A lightweight Go HTTP server that implements a mock RedFish API, providing endpo
    ./redfish_api_mock -host localhost -port 8080
    ```
 
+   You will need to first rename `config.json.default` to `config.json`.
    Mock identity and inventory values are loaded from `config.json`. To use a
    different file:
 
    ```bash
+   cp config.json.default config.json
    ./redfish_api_mock -config /path/to/my-config.json
    ```
 
