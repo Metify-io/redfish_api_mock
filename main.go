@@ -1024,7 +1024,7 @@ func main() {
 
 	loadedConfig, err := loadConfig(*configPath)
 	if err != nil {
-		log.Fatalf("load config %q: %v", *configPath, err)
+		log.Fatalf("load config %q: %v. Might need to copy config.json.default to config.json", *configPath, err)
 	}
 	config = loadedConfig
 
