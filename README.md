@@ -102,7 +102,8 @@ curl -u admin:password http://localhost:8080/redfish/v1/ | jq
 
 ## Authentication
 
-All endpoints require HTTP Basic Authentication:
+Protected endpoints require HTTP Basic Authentication. The credentials are set
+in the `authentication` section of `config.json`:
 
 - **Username:** `admin`
 - **Password:** `password`
