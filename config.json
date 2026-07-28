@@ -1,0 +1,69 @@
+{
+  "service_root": {
+    "uuid": "92384634-2938-2342-8820-489239905423",
+    "product": "Mock RedFish Server v1.0",
+    "vendor": "Mock Vendor Corporation",
+    "oem": {
+      "Vendor": {
+        "@odata.type": "#MockVendorExtensions.v1_0_0.ServiceRoot",
+        "ServerModel": "Mock Enterprise Server X1000",
+        "HardwareVersion": "Rev 2.1",
+        "ManagementVersion": "BMC 3.2.1",
+        "SupportContact": "support@mockvendor.com",
+        "WarrantyStatus": "Active",
+        "WarrantyExpiration": "2026-12-31"
+      }
+    }
+  },
+  "system": {
+    "name": "System",
+    "system_type": "Physical",
+    "manufacturer": "MetifyIO",
+    "model": "Mock Server X1000",
+    "serial_number": "MOCK123456789",
+    "part_number": "MOCK-SRV-001",
+    "power_state": "On",
+    "bios_version": "1.0.0",
+    "processor_count": 2,
+    "processor_model": "Mock CPU X5000",
+    "total_system_memory_gib": 64,
+    "installation_status_oem_key": "MockVendor",
+    "oem": {}
+  },
+  "chassis": {
+    "name": "Chassis",
+    "chassis_type": "RackMount",
+    "manufacturer": "Vendor",
+    "model": "Mock Chassis 1U",
+    "serial_number": "MOCK-CHASSIS-123",
+    "part_number": "MOCK-CHS-001"
+  },
+  "manager": {
+    "name": "Manager",
+    "manager_type": "BMC",
+    "firmware_version": "1.0.0"
+  },
+  "firmware_inventory": [
+    {
+      "id": "BIOS",
+      "name": "System BIOS",
+      "version": "1.0.0",
+      "updateable": true,
+      "software_id": "BIOS-1.0.0"
+    },
+    {
+      "id": "BMC",
+      "name": "Baseboard Management Controller",
+      "version": "2.1.0",
+      "updateable": true,
+      "software_id": "BMC-2.1.0"
+    },
+    {
+      "id": "NIC",
+      "name": "Network Interface Controller",
+      "version": "3.2.1",
+      "updateable": true,
+      "software_id": "NIC-3.2.1"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -101,6 +102,140 @@ type MemorySummary struct {
 type Status struct {
 	State  string `json:"State"`
 	Health string `json:"Health"`
+}
+
+type Config struct {
+	ServiceRoot ServiceRootConfig    `json:"service_root"`
+	System      SystemConfig         `json:"system"`
+	Chassis     ChassisConfig        `json:"chassis"`
+	Manager     ManagerConfig        `json:"manager"`
+	Firmware    []FirmwareItemConfig `json:"firmware_inventory"`
+}
+
+type ServiceRootConfig struct {
+	UUID    string         `json:"uuid"`
+	Product string         `json:"product"`
+	Vendor  string         `json:"vendor"`
+	Oem     map[string]any `json:"oem"`
+}
+
+type SystemConfig struct {
+	Name                     string         `json:"name"`
+	SystemType               string         `json:"system_type"`
+	Manufacturer             string         `json:"manufacturer"`
+	Model                    string         `json:"model"`
+	SerialNumber             string         `json:"serial_number"`
+	PartNumber               string         `json:"part_number"`
+	PowerState               string         `json:"power_state"`
+	BiosVersion              string         `json:"bios_version"`
+	ProcessorCount           int            `json:"processor_count"`
+	ProcessorModel           string         `json:"processor_model"`
+	TotalSystemMemoryGiB     int            `json:"total_system_memory_gib"`
+	Oem                      map[string]any `json:"oem"`
+	InstallationStatusOemKey string         `json:"installation_status_oem_key"`
+}
+
+type ChassisConfig struct {
+	Name         string `json:"name"`
+	ChassisType  string `json:"chassis_type"`
+	Manufacturer string `json:"manufacturer"`
+	Model        string `json:"model"`
+	SerialNumber string `json:"serial_number"`
+	PartNumber   string `json:"part_number"`
+}
+
+type ManagerConfig struct {
+	Name            string `json:"name"`
+	ManagerType     string `json:"manager_type"`
+	FirmwareVersion string `json:"firmware_version"`
+}
+
+type FirmwareItemConfig struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Version    string `json:"version"`
+	Updateable bool   `json:"updateable"`
+	SoftwareID string `json:"software_id"`
+}
+
+var config = defaultConfig()
+
+func defaultConfig() Config {
+	return Config{
+		ServiceRoot: ServiceRootConfig{
+			UUID:    "92384634-2938-2342-8820-489239905423",
+			Product: "Mock RedFish Server v1.0",
+			Vendor:  "Mock Vendor Corporation",
+			Oem: map[string]any{
+				"Vendor": map[string]any{
+					"@odata.type":        "#MockVendorExtensions.v1_0_0.ServiceRoot",
+					"ServerModel":        "Mock Enterprise Server X1000",
+					"HardwareVersion":    "Rev 2.1",
+					"ManagementVersion":  "BMC 3.2.1",
+					"SupportContact":     "support@mockvendor.com",
+					"WarrantyStatus":     "Active",
+					"WarrantyExpiration": "2026-12-31",
+				},
+			},
+		},
+		System: SystemConfig{
+			Name:                     "System",
+			SystemType:               "Physical",
+			Manufacturer:             "MetifyIO",
+			Model:                    "Mock Server X1000",
+			SerialNumber:             "MOCK123456789",
+			PartNumber:               "MOCK-SRV-001",
+			PowerState:               "On",
+			BiosVersion:              "1.0.0",
+			ProcessorCount:           2,
+			ProcessorModel:           "Mock CPU X5000",
+			TotalSystemMemoryGiB:     64,
+			Oem:                      map[string]any{},
+			InstallationStatusOemKey: "MockVendor",
+		},
+		Chassis: ChassisConfig{
+			Name:         "Chassis",
+			ChassisType:  "RackMount",
+			Manufacturer: "Vendor",
+			Model:        "Mock Chassis 1U",
+			SerialNumber: "MOCK-CHASSIS-123",
+			PartNumber:   "MOCK-CHS-001",
+		},
+		Manager: ManagerConfig{
+			Name:            "Manager",
+			ManagerType:     "BMC",
+			FirmwareVersion: "1.0.0",
+		},
+		Firmware: []FirmwareItemConfig{
+			{ID: "BIOS", Name: "System BIOS", Version: "1.0.0", Updateable: true, SoftwareID: "BIOS-1.0.0"},
+			{ID: "BMC", Name: "Baseboard Management Controller", Version: "2.1.0", Updateable: true, SoftwareID: "BMC-2.1.0"},
+			{ID: "NIC", Name: "Network Interface Controller", Version: "3.2.1", Updateable: true, SoftwareID: "NIC-3.2.1"},
+		},
+	}
+}
+
+func loadConfig(path string) (Config, error) {
+	loaded := defaultConfig()
+	file, err := os.Open(path)
+	if err != nil {
+		return Config{}, err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&loaded); err != nil {
+		return Config{}, fmt.Errorf("decode config: %w", err)
+	}
+	for i, item := range loaded.Firmware {
+		if item.ID == "" {
+			return Config{}, fmt.Errorf("firmware_inventory[%d].id is required", i)
+		}
+	}
+	if loaded.System.InstallationStatusOemKey == "" {
+		return Config{}, errors.New("system.installation_status_oem_key is required")
+	}
+	return loaded, nil
 }
 
 type Chassis struct {
@@ -284,20 +419,10 @@ func getServiceRoot(c *gin.Context) {
 		ID:             "RootService",
 		Name:           "Root Service",
 		RedfishVersion: "1.18.0",
-		UUID:           "92384634-2938-2342-8820-489239905423",
-		Product:        "Mock RedFish Server v1.0",
-		Vendor:         "Mock Vendor Corporation",
-		Oem: map[string]interface{}{
-			"Vendor": map[string]interface{}{
-				"@odata.type":        "#MockVendorExtensions.v1_0_0.ServiceRoot",
-				"ServerModel":        "Mock Enterprise Server X1000",
-				"HardwareVersion":    "Rev 2.1",
-				"ManagementVersion":  "BMC 3.2.1",
-				"SupportContact":     "support@mockvendor.com",
-				"WarrantyStatus":     "Active",
-				"WarrantyExpiration": "2026-12-31",
-			},
-		},
+		UUID:           config.ServiceRoot.UUID,
+		Product:        config.ServiceRoot.Product,
+		Vendor:         config.ServiceRoot.Vendor,
+		Oem:            config.ServiceRoot.Oem,
 		Systems:        Link{ODataID: "/redfish/v1/Systems"},
 		Chassis:        Link{ODataID: "/redfish/v1/Chassis"},
 		Managers:       Link{ODataID: "/redfish/v1/Managers"},
@@ -336,27 +461,39 @@ func getSystem(c *gin.Context) {
 	bootMode := mockState.bootSourceOverrideMode
 	installationStatus := mockState.installationStatus
 	mockState.Unlock()
+	oem := make(map[string]any, len(config.System.Oem)+1)
+	for key, value := range config.System.Oem {
+		oem[key] = value
+	}
+	installationOem := map[string]any{}
+	if configuredOem, ok := oem[config.System.InstallationStatusOemKey].(map[string]any); ok {
+		for key, value := range configuredOem {
+			installationOem[key] = value
+		}
+	}
+	installationOem["InstallationStatus"] = installationStatus
+	oem[config.System.InstallationStatusOemKey] = installationOem
 
 	system := ComputerSystem{
 		ODataContext: "/redfish/v1/$metadata#ComputerSystem.ComputerSystem",
 		ODataType:    "#ComputerSystem.v1_22_0.ComputerSystem",
 		ODataID:      "/redfish/v1/Systems/" + systemID,
 		ID:           systemID,
-		Name:         "System",
-		SystemType:   "Physical",
-		Manufacturer: "MetifyIO",
-		Model:        "Mock Server X1000",
-		SerialNumber: "MOCK123456789",
-		PartNumber:   "MOCK-SRV-001",
-		PowerState:   "On",
-		BiosVersion:  "1.0.0",
+		Name:         config.System.Name,
+		SystemType:   config.System.SystemType,
+		Manufacturer: config.System.Manufacturer,
+		Model:        config.System.Model,
+		SerialNumber: config.System.SerialNumber,
+		PartNumber:   config.System.PartNumber,
+		PowerState:   config.System.PowerState,
+		BiosVersion:  config.System.BiosVersion,
 		ProcessorSummary: ProcessorSummary{
-			Count:  2,
-			Model:  "Mock CPU X5000",
+			Count:  config.System.ProcessorCount,
+			Model:  config.System.ProcessorModel,
 			Status: Status{State: "Enabled", Health: "OK"},
 		},
 		MemorySummary: MemorySummary{
-			TotalSystemMemoryGiB: 64,
+			TotalSystemMemoryGiB: config.System.TotalSystemMemoryGiB,
 			Status:               Status{State: "Enabled", Health: "OK"},
 		},
 		Status: Status{State: "Enabled", Health: "OK"},
@@ -373,11 +510,7 @@ func getSystem(c *gin.Context) {
 				AllowableValues: []string{"On", "ForceOff", "GracefulShutdown", "GracefulRestart", "ForceRestart", "PowerCycle"},
 			},
 		},
-		Oem: map[string]any{
-			"MockVendor": map[string]any{
-				"InstallationStatus": installationStatus,
-			},
-		},
+		Oem: oem,
 	}
 	c.JSON(http.StatusOK, system)
 }
@@ -483,12 +616,12 @@ func getChassis(c *gin.Context) {
 		ODataType:    "#Chassis.v1_25_0.Chassis",
 		ODataID:      "/redfish/v1/Chassis/" + chassisID,
 		ID:           chassisID,
-		Name:         "Chassis",
-		ChassisType:  "RackMount",
-		Manufacturer: "Vendor",
-		Model:        "Mock Chassis 1U",
-		SerialNumber: "MOCK-CHASSIS-123",
-		PartNumber:   "MOCK-CHS-001",
+		Name:         config.Chassis.Name,
+		ChassisType:  config.Chassis.ChassisType,
+		Manufacturer: config.Chassis.Manufacturer,
+		Model:        config.Chassis.Model,
+		SerialNumber: config.Chassis.SerialNumber,
+		PartNumber:   config.Chassis.PartNumber,
 		Status:       Status{State: "Enabled", Health: "OK"},
 	}
 	c.JSON(http.StatusOK, chassis)
@@ -518,9 +651,9 @@ func getManager(c *gin.Context) {
 		ODataType:       "#Manager.v1_19_0.Manager",
 		ODataID:         "/redfish/v1/Managers/" + managerID,
 		ID:              managerID,
-		Name:            "Manager",
-		ManagerType:     "BMC",
-		FirmwareVersion: "1.0.0",
+		Name:            config.Manager.Name,
+		ManagerType:     config.Manager.ManagerType,
+		FirmwareVersion: config.Manager.FirmwareVersion,
 		Status:          Status{State: "Enabled", Health: "OK"},
 		VirtualMedia:    Link{ODataID: "/redfish/v1/Managers/" + managerID + "/VirtualMedia"},
 	}
@@ -735,17 +868,17 @@ func getUpdateService(c *gin.Context) {
 
 func getFirmwareInventoryCollection(c *gin.Context) {
 	c.Header("OData-Version", "4.0")
+	members := make([]Link, 0, len(config.Firmware))
+	for _, item := range config.Firmware {
+		members = append(members, Link{ODataID: "/redfish/v1/UpdateService/FirmwareInventory/" + item.ID})
+	}
 	collection := Collection{
 		ODataContext: "/redfish/v1/$metadata#SoftwareInventoryCollection.SoftwareInventoryCollection",
 		ODataType:    "#SoftwareInventoryCollection.SoftwareInventoryCollection",
 		ODataID:      "/redfish/v1/UpdateService/FirmwareInventory",
 		Name:         "Firmware Inventory Collection",
-		MembersCount: 3,
-		Members: []Link{
-			{ODataID: "/redfish/v1/UpdateService/FirmwareInventory/BIOS"},
-			{ODataID: "/redfish/v1/UpdateService/FirmwareInventory/BMC"},
-			{ODataID: "/redfish/v1/UpdateService/FirmwareInventory/NIC"},
-		},
+		MembersCount: len(members),
+		Members:      members,
 	}
 	c.JSON(http.StatusOK, collection)
 }
@@ -754,51 +887,23 @@ func getFirmwareInventoryItem(c *gin.Context) {
 	c.Header("OData-Version", "4.0")
 	itemID := c.Param("id")
 
-	var inventory SoftwareInventory
-
-	switch itemID {
-	case "BIOS":
-		inventory = SoftwareInventory{
-			ODataContext: "/redfish/v1/$metadata#SoftwareInventory.SoftwareInventory",
-			ODataType:    "#SoftwareInventory.v1_10_0.SoftwareInventory",
-			ODataID:      "/redfish/v1/UpdateService/FirmwareInventory/BIOS",
-			ID:           "BIOS",
-			Name:         "System BIOS",
-			Version:      "1.0.0",
-			Updateable:   true,
-			Status:       Status{State: "Enabled", Health: "OK"},
-			SoftwareId:   "BIOS-1.0.0",
+	for _, item := range config.Firmware {
+		if item.ID == itemID {
+			c.JSON(http.StatusOK, SoftwareInventory{
+				ODataContext: "/redfish/v1/$metadata#SoftwareInventory.SoftwareInventory",
+				ODataType:    "#SoftwareInventory.v1_10_0.SoftwareInventory",
+				ODataID:      "/redfish/v1/UpdateService/FirmwareInventory/" + item.ID,
+				ID:           item.ID,
+				Name:         item.Name,
+				Version:      item.Version,
+				Updateable:   item.Updateable,
+				Status:       Status{State: "Enabled", Health: "OK"},
+				SoftwareId:   item.SoftwareID,
+			})
+			return
 		}
-	case "BMC":
-		inventory = SoftwareInventory{
-			ODataContext: "/redfish/v1/$metadata#SoftwareInventory.SoftwareInventory",
-			ODataType:    "#SoftwareInventory.v1_10_0.SoftwareInventory",
-			ODataID:      "/redfish/v1/UpdateService/FirmwareInventory/BMC",
-			ID:           "BMC",
-			Name:         "Baseboard Management Controller",
-			Version:      "2.1.0",
-			Updateable:   true,
-			Status:       Status{State: "Enabled", Health: "OK"},
-			SoftwareId:   "BMC-2.1.0",
-		}
-	case "NIC":
-		inventory = SoftwareInventory{
-			ODataContext: "/redfish/v1/$metadata#SoftwareInventory.SoftwareInventory",
-			ODataType:    "#SoftwareInventory.v1_10_0.SoftwareInventory",
-			ODataID:      "/redfish/v1/UpdateService/FirmwareInventory/NIC",
-			ID:           "NIC",
-			Name:         "Network Interface Controller",
-			Version:      "3.2.1",
-			Updateable:   true,
-			Status:       Status{State: "Enabled", Health: "OK"},
-			SoftwareId:   "NIC-3.2.1",
-		}
-	default:
-		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
-		return
 	}
-
-	c.JSON(http.StatusOK, inventory)
+	c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 }
 
 func simpleUpdate(c *gin.Context) {
@@ -914,7 +1019,14 @@ func getLicense(c *gin.Context) {
 func main() {
 	port := flag.String("port", "8080", "Port to listen on")
 	host := flag.String("host", "localhost", "Host to listen on")
+	configPath := flag.String("config", "config.json", "Path to mock data config file")
 	flag.Parse()
+
+	loadedConfig, err := loadConfig(*configPath)
+	if err != nil {
+		log.Fatalf("load config %q: %v", *configPath, err)
+	}
+	config = loadedConfig
 
 	r := gin.Default()
 
