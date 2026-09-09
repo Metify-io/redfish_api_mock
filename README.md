@@ -213,7 +213,7 @@ Configure a one-time boot from the virtual CD and restart the system:
 ```bash
 curl -u admin:password -X PATCH \
   -H "Content-Type: application/json" \
-  -d '{"Boot":{"BootSourceOverrideEnabled":"Once","BootSourceOverrideTarget":"Cd"}}' \
+  -d '{"Boot":{"BootSourceOverrideEnabled":"Once","BootSourceOverrideMode":"Legacy","BootSourceOverrideTarget":"UsbCd"}}' \
   http://localhost:8080/redfish/v1/Systems/1
 
 curl -u admin:password -X POST \
