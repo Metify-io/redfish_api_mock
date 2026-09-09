@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -56,6 +57,85 @@ func TestOEMProfiles(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSupermicroProvisioningBootOverride(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"oem":"supermicro"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := loadConfig(path)
+	if err != nil {
+		t.Fatalf("loadConfig() error = %v", err)
+	}
+	previousConfig := config
+	config = loaded
+	mockState.Lock()
+	previousImage := mockState.image
+	previousInserted := mockState.inserted
+	previousWriteProtected := mockState.writeProtected
+	previousBootEnabled := mockState.bootSourceOverrideEnabled
+	previousBootTarget := mockState.bootSourceOverrideTarget
+	previousBootMode := mockState.bootSourceOverrideMode
+	previousInstallationStatus := mockState.installationStatus
+	previousInstallationStartedAt := mockState.installationStartedAt
+	mockState.bootSourceOverrideEnabled = "Disabled"
+	mockState.bootSourceOverrideTarget = "None"
+	mockState.bootSourceOverrideMode = "UEFI"
+	mockState.Unlock()
+	t.Cleanup(func() {
+		config = previousConfig
+		mockState.Lock()
+		mockState.image = previousImage
+		mockState.inserted = previousInserted
+		mockState.writeProtected = previousWriteProtected
+		mockState.bootSourceOverrideEnabled = previousBootEnabled
+		mockState.bootSourceOverrideTarget = previousBootTarget
+		mockState.bootSourceOverrideMode = previousBootMode
+		mockState.installationStatus = previousInstallationStatus
+		mockState.installationStartedAt = previousInstallationStartedAt
+		mockState.Unlock()
+	})
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.PATCH("/redfish/v1/Systems/:id", patchSystem)
+	router.GET("/redfish/v1/Systems/:id", getSystem)
+
+	payload := []byte(`{
+  "Boot": {
+    "BootSourceOverrideEnabled": "Once",
+    "BootSourceOverrideMode": "Legacy",
+    "BootSourceOverrideTarget": "UsbCd"
+  }
+}`)
+	request := httptest.NewRequest(http.MethodPatch, "/redfish/v1/Systems/1", bytes.NewReader(payload))
+	request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("PATCH status = %d, want %d; body = %s", recorder.Code, http.StatusNoContent, recorder.Body.String())
+	}
+
+	request = httptest.NewRequest(http.MethodGet, "/redfish/v1/Systems/1", nil)
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	var system ComputerSystem
+	if err := json.Unmarshal(recorder.Body.Bytes(), &system); err != nil {
+		t.Fatalf("decode system response: %v", err)
+	}
+	if system.Boot.BootSourceOverrideEnabled != "Once" || system.Boot.BootSourceOverrideMode != "Legacy" || system.Boot.BootSourceOverrideTarget != "UsbCd" {
+		t.Fatalf("persisted boot override = %#v", system.Boot)
+	}
+	for _, target := range system.Boot.BootSourceOverrideTargetAllowable {
+		if target == "UsbCd" {
+			return
+		}
+	}
+	t.Fatalf("allowable boot targets = %v, want UsbCd", system.Boot.BootSourceOverrideTargetAllowable)
 }
 
 func TestLoadConfigRejectsUnsupportedOEM(t *testing.T) {
