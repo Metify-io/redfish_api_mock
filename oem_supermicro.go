@@ -15,9 +15,9 @@ func (supermicroOEM) applyDefaults(config *Config) {
 		"Supermicro": map[string]any{"@odata.type": "#SmcServiceRootExtensions.v1_0_0.ServiceRoot"},
 	}
 	config.System.Manufacturer = "Supermicro"
-	config.System.Model = "SuperServer"
+	config.System.Model = "SuperMicro"
 	config.System.InstallationStatusOemKey = "Supermicro"
 	config.Chassis.Manufacturer = "Supermicro"
-	config.Chassis.Model = "SuperServer Chassis"
+	config.Chassis.Model = "SuperMicro Chassis"
 	config.Manager.Name = "BMC"
 }

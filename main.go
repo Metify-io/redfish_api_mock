@@ -512,7 +512,7 @@ func getSystem(c *gin.Context) {
 			BootSourceOverrideTarget:           bootTarget,
 			BootSourceOverrideMode:             bootMode,
 			BootSourceOverrideEnabledAllowable: []string{"Disabled", "Once", "Continuous"},
-			BootSourceOverrideTargetAllowable:  []string{"None", "Cd", "Hdd", "Pxe", "Usb"},
+			BootSourceOverrideTargetAllowable:  []string{"None", "Cd", "Hdd", "Pxe", "Usb", "UsbCd"},
 		},
 		Actions: SystemActions{
 			Reset: ResetAction{
@@ -550,7 +550,7 @@ func patchSystem(c *gin.Context) {
 	}
 	if req.Boot.BootSourceOverrideTarget != nil {
 		switch *req.Boot.BootSourceOverrideTarget {
-		case "None", "Cd", "Hdd", "Pxe", "Usb":
+		case "None", "Cd", "Hdd", "Pxe", "Usb", "UsbCd":
 			bootTarget = *req.Boot.BootSourceOverrideTarget
 		default:
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported BootSourceOverrideTarget value"})
@@ -591,7 +591,7 @@ func resetSystem(c *gin.Context) {
 	mockState.Lock()
 	defer mockState.Unlock()
 	bootsSystem := req.ResetType == "On" || req.ResetType == "GracefulRestart" || req.ResetType == "ForceRestart" || req.ResetType == "PowerCycle"
-	if bootsSystem && mockState.inserted && mockState.bootSourceOverrideTarget == "Cd" && mockState.bootSourceOverrideEnabled != "Disabled" {
+	if bootsSystem && mockState.inserted && (mockState.bootSourceOverrideTarget == "Cd" || mockState.bootSourceOverrideTarget == "UsbCd") && mockState.bootSourceOverrideEnabled != "Disabled" {
 		mockState.installationStatus = "Installing"
 		mockState.installationStartedAt = time.Now()
 		if mockState.bootSourceOverrideEnabled == "Once" {
