@@ -77,6 +77,8 @@ curl -u admin:password http://localhost:8080/redfish/v1/ | jq
 
 - `GET /redfish/v1/Systems` - Collection of computer systems
 - `GET /redfish/v1/Systems/{id}` - Individual computer system details
+- `GET /redfish/v1/Systems/{id}/EthernetInterfaces` - Ethernet interface collection
+- `GET /redfish/v1/Systems/{id}/EthernetInterfaces/{interfaceId}` - Ethernet interface with its configured MAC address
 - `PATCH /redfish/v1/Systems/{id}` - Configure boot source override
 - `POST /redfish/v1/Systems/{id}/Actions/ComputerSystem.Reset` - Reset the system
 
@@ -150,6 +152,11 @@ For example, a profile can still be customized with:
         "AssetTag": "lab-server"
       }
     }
+  },
+  "ethernet_interface": {
+    "id": "1",
+    "name": "Provisioning NIC",
+    "mac_address": "02:00:00:00:00:01"
   }
 }
 ```

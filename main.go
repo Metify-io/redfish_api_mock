@@ -51,24 +51,25 @@ type Collection struct {
 }
 
 type ComputerSystem struct {
-	ODataContext     string           `json:"@odata.context"`
-	ODataType        string           `json:"@odata.type"`
-	ODataID          string           `json:"@odata.id"`
-	ID               string           `json:"Id"`
-	Name             string           `json:"Name"`
-	SystemType       string           `json:"SystemType"`
-	Manufacturer     string           `json:"Manufacturer"`
-	Model            string           `json:"Model"`
-	SerialNumber     string           `json:"SerialNumber"`
-	PartNumber       string           `json:"PartNumber"`
-	PowerState       string           `json:"PowerState"`
-	BiosVersion      string           `json:"BiosVersion"`
-	ProcessorSummary ProcessorSummary `json:"ProcessorSummary"`
-	MemorySummary    MemorySummary    `json:"MemorySummary"`
-	Status           Status           `json:"Status"`
-	Boot             Boot             `json:"Boot"`
-	Actions          SystemActions    `json:"Actions"`
-	Oem              map[string]any   `json:"Oem"`
+	ODataContext       string           `json:"@odata.context"`
+	ODataType          string           `json:"@odata.type"`
+	ODataID            string           `json:"@odata.id"`
+	ID                 string           `json:"Id"`
+	Name               string           `json:"Name"`
+	SystemType         string           `json:"SystemType"`
+	Manufacturer       string           `json:"Manufacturer"`
+	Model              string           `json:"Model"`
+	SerialNumber       string           `json:"SerialNumber"`
+	PartNumber         string           `json:"PartNumber"`
+	PowerState         string           `json:"PowerState"`
+	BiosVersion        string           `json:"BiosVersion"`
+	ProcessorSummary   ProcessorSummary `json:"ProcessorSummary"`
+	MemorySummary      MemorySummary    `json:"MemorySummary"`
+	Status             Status           `json:"Status"`
+	Boot               Boot             `json:"Boot"`
+	Actions            SystemActions    `json:"Actions"`
+	EthernetInterfaces Link             `json:"EthernetInterfaces"`
+	Oem                map[string]any   `json:"Oem"`
 }
 
 type Boot struct {
@@ -105,13 +106,14 @@ type Status struct {
 }
 
 type Config struct {
-	OEM            string               `json:"oem"`
-	Authentication AuthenticationConfig `json:"authentication"`
-	ServiceRoot    ServiceRootConfig    `json:"service_root"`
-	System         SystemConfig         `json:"system"`
-	Chassis        ChassisConfig        `json:"chassis"`
-	Manager        ManagerConfig        `json:"manager"`
-	Firmware       []FirmwareItemConfig `json:"firmware_inventory"`
+	OEM               string                  `json:"oem"`
+	Authentication    AuthenticationConfig    `json:"authentication"`
+	ServiceRoot       ServiceRootConfig       `json:"service_root"`
+	System            SystemConfig            `json:"system"`
+	EthernetInterface EthernetInterfaceConfig `json:"ethernet_interface"`
+	Chassis           ChassisConfig           `json:"chassis"`
+	Manager           ManagerConfig           `json:"manager"`
+	Firmware          []FirmwareItemConfig    `json:"firmware_inventory"`
 }
 
 type AuthenticationConfig struct {
@@ -140,6 +142,12 @@ type SystemConfig struct {
 	TotalSystemMemoryGiB     int            `json:"total_system_memory_gib"`
 	Oem                      map[string]any `json:"oem"`
 	InstallationStatusOemKey string         `json:"installation_status_oem_key"`
+}
+
+type EthernetInterfaceConfig struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	MACAddress string `json:"mac_address"`
 }
 
 type ChassisConfig struct {
@@ -188,6 +196,11 @@ func defaultConfig() Config {
 			ProcessorModel:       "Mock CPU X5000",
 			TotalSystemMemoryGiB: 64,
 			Oem:                  map[string]any{},
+		},
+		EthernetInterface: EthernetInterfaceConfig{
+			ID:         "1",
+			Name:       "Ethernet Interface 1",
+			MACAddress: "02:00:00:00:00:01",
 		},
 		Chassis: ChassisConfig{
 			Name:         "Chassis",
@@ -271,6 +284,18 @@ type Manager struct {
 	FirmwareVersion string `json:"FirmwareVersion"`
 	Status          Status `json:"Status"`
 	VirtualMedia    Link   `json:"VirtualMedia"`
+}
+
+type EthernetInterface struct {
+	ODataContext        string `json:"@odata.context"`
+	ODataType           string `json:"@odata.type"`
+	ODataID             string `json:"@odata.id"`
+	ID                  string `json:"Id"`
+	Name                string `json:"Name"`
+	InterfaceEnabled    bool   `json:"InterfaceEnabled"`
+	MACAddress          string `json:"MACAddress"`
+	PermanentMACAddress string `json:"PermanentMACAddress"`
+	Status              Status `json:"Status"`
 }
 
 type VirtualMedia struct {
@@ -523,9 +548,49 @@ func getSystem(c *gin.Context) {
 				AllowableValues: []string{"On", "ForceOff", "GracefulShutdown", "GracefulRestart", "ForceRestart", "PowerCycle"},
 			},
 		},
-		Oem: oem,
+		EthernetInterfaces: Link{ODataID: "/redfish/v1/Systems/" + systemID + "/EthernetInterfaces"},
+		Oem:                oem,
 	}
 	c.JSON(http.StatusOK, system)
+}
+
+func getEthernetInterfacesCollection(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
+	systemID := c.Param("id")
+	collection := Collection{
+		ODataContext: "/redfish/v1/$metadata#EthernetInterfaceCollection.EthernetInterfaceCollection",
+		ODataType:    "#EthernetInterfaceCollection.EthernetInterfaceCollection",
+		ODataID:      "/redfish/v1/Systems/" + systemID + "/EthernetInterfaces",
+		Name:         "Ethernet Interface Collection",
+		MembersCount: 1,
+		Members: []Link{
+			{ODataID: "/redfish/v1/Systems/" + systemID + "/EthernetInterfaces/" + config.EthernetInterface.ID},
+		},
+	}
+	c.JSON(http.StatusOK, collection)
+}
+
+func getEthernetInterface(c *gin.Context) {
+	c.Header("OData-Version", "4.0")
+	systemID := c.Param("id")
+	interfaceID := c.Param("interfaceID")
+	if interfaceID != config.EthernetInterface.ID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+		return
+	}
+
+	ethernetInterface := EthernetInterface{
+		ODataContext:        "/redfish/v1/$metadata#EthernetInterface.EthernetInterface",
+		ODataType:           "#EthernetInterface.v1_12_2.EthernetInterface",
+		ODataID:             "/redfish/v1/Systems/" + systemID + "/EthernetInterfaces/" + interfaceID,
+		ID:                  interfaceID,
+		Name:                config.EthernetInterface.Name,
+		InterfaceEnabled:    true,
+		MACAddress:          config.EthernetInterface.MACAddress,
+		PermanentMACAddress: config.EthernetInterface.MACAddress,
+		Status:              Status{State: "Enabled", Health: "OK"},
+	}
+	c.JSON(http.StatusOK, ethernetInterface)
 }
 
 func patchSystem(c *gin.Context) {
@@ -1071,6 +1136,9 @@ func main() {
 	protected.GET("/Systems/:id", getSystem)
 	protected.PATCH("/Systems/:id", patchSystem)
 	protected.POST("/Systems/:id/Actions/ComputerSystem.Reset", resetSystem)
+	protected.GET("/Systems/:id/EthernetInterfaces", getEthernetInterfacesCollection)
+	protected.GET("/Systems/:id/EthernetInterfaces/", getEthernetInterfacesCollection)
+	protected.GET("/Systems/:id/EthernetInterfaces/:interfaceID", getEthernetInterface)
 
 	// Chassis endpoints
 	protected.GET("/Chassis", getChassisCollection)

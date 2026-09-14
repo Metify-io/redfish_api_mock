@@ -18,6 +18,11 @@
     "processor_model": "Mock CPU X5000",
     "total_system_memory_gib": 64
   },
+  "ethernet_interface": {
+    "id": "1",
+    "name": "Ethernet Interface 1",
+    "mac_address": "02:00:00:00:00:01"
+  },
   "chassis": {
     "name": "Chassis",
     "chassis_type": "RackMount",

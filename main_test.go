@@ -201,6 +201,77 @@ func TestResetSystemUpdatesPowerState(t *testing.T) {
 	}
 }
 
+func TestConfiguredEthernetInterface(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{
+  "ethernet_interface": {
+    "id": "PXE1",
+    "name": "Provisioning NIC",
+    "mac_address": "02:12:34:56:78:9A"
+  }
+}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := loadConfig(path)
+	if err != nil {
+		t.Fatalf("loadConfig() error = %v", err)
+	}
+	previousConfig := config
+	config = loaded
+	t.Cleanup(func() { config = previousConfig })
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/redfish/v1/Systems/:id", getSystem)
+	router.GET("/redfish/v1/Systems/:id/EthernetInterfaces", getEthernetInterfacesCollection)
+	router.GET("/redfish/v1/Systems/:id/EthernetInterfaces/:interfaceID", getEthernetInterface)
+
+	request := httptest.NewRequest(http.MethodGet, "/redfish/v1/Systems/1", nil)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("system GET status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	var system ComputerSystem
+	if err := json.Unmarshal(recorder.Body.Bytes(), &system); err != nil {
+		t.Fatalf("decode system response: %v", err)
+	}
+	if system.EthernetInterfaces.ODataID != "/redfish/v1/Systems/1/EthernetInterfaces" {
+		t.Fatalf("EthernetInterfaces link = %q", system.EthernetInterfaces.ODataID)
+	}
+
+	request = httptest.NewRequest(http.MethodGet, system.EthernetInterfaces.ODataID, nil)
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("collection GET status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	var collection Collection
+	if err := json.Unmarshal(recorder.Body.Bytes(), &collection); err != nil {
+		t.Fatalf("decode Ethernet interface collection: %v", err)
+	}
+	if collection.MembersCount != 1 || len(collection.Members) != 1 {
+		t.Fatalf("Ethernet interface collection = %#v", collection)
+	}
+
+	request = httptest.NewRequest(http.MethodGet, collection.Members[0].ODataID, nil)
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("interface GET status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	var ethernetInterface EthernetInterface
+	if err := json.Unmarshal(recorder.Body.Bytes(), &ethernetInterface); err != nil {
+		t.Fatalf("decode Ethernet interface: %v", err)
+	}
+	if ethernetInterface.ID != "PXE1" || ethernetInterface.Name != "Provisioning NIC" {
+		t.Fatalf("Ethernet interface identity = %#v", ethernetInterface)
+	}
+	if ethernetInterface.MACAddress != "02:12:34:56:78:9A" || ethernetInterface.PermanentMACAddress != "02:12:34:56:78:9A" {
+		t.Fatalf("Ethernet interface MAC addresses = %q, %q", ethernetInterface.MACAddress, ethernetInterface.PermanentMACAddress)
+	}
+}
+
 func TestLoadConfigRejectsUnsupportedOEM(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	if err := os.WriteFile(path, []byte(`{"oem":"unknown"}`), 0o600); err != nil {
