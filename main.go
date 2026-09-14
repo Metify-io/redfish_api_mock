@@ -321,6 +321,7 @@ type mockServerState struct {
 	image                     string
 	inserted                  bool
 	writeProtected            bool
+	powerState                string
 	bootSourceOverrideEnabled string
 	bootSourceOverrideTarget  string
 	bootSourceOverrideMode    string
@@ -330,6 +331,7 @@ type mockServerState struct {
 
 var mockState = mockServerState{
 	writeProtected:            true,
+	powerState:                "On",
 	bootSourceOverrideEnabled: "Disabled",
 	bootSourceOverrideTarget:  "None",
 	bootSourceOverrideMode:    "UEFI",
@@ -469,6 +471,7 @@ func getSystem(c *gin.Context) {
 	bootEnabled := mockState.bootSourceOverrideEnabled
 	bootTarget := mockState.bootSourceOverrideTarget
 	bootMode := mockState.bootSourceOverrideMode
+	powerState := mockState.powerState
 	installationStatus := mockState.installationStatus
 	mockState.Unlock()
 	oem := make(map[string]any, len(config.System.Oem)+1)
@@ -495,7 +498,7 @@ func getSystem(c *gin.Context) {
 		Model:        config.System.Model,
 		SerialNumber: config.System.SerialNumber,
 		PartNumber:   config.System.PartNumber,
-		PowerState:   config.System.PowerState,
+		PowerState:   powerState,
 		BiosVersion:  config.System.BiosVersion,
 		ProcessorSummary: ProcessorSummary{
 			Count:  config.System.ProcessorCount,
@@ -591,6 +594,11 @@ func resetSystem(c *gin.Context) {
 	mockState.Lock()
 	defer mockState.Unlock()
 	bootsSystem := req.ResetType == "On" || req.ResetType == "GracefulRestart" || req.ResetType == "ForceRestart" || req.ResetType == "PowerCycle"
+	if bootsSystem {
+		mockState.powerState = "On"
+	} else {
+		mockState.powerState = "Off"
+	}
 	if bootsSystem && mockState.inserted && (mockState.bootSourceOverrideTarget == "Cd" || mockState.bootSourceOverrideTarget == "UsbCd") && mockState.bootSourceOverrideEnabled != "Disabled" {
 		mockState.installationStatus = "Installing"
 		mockState.installationStartedAt = time.Now()
@@ -1041,6 +1049,9 @@ func main() {
 		log.Fatalf("load config %q: %v. Might need to copy config.json.default to config.json", *configPath, err)
 	}
 	config = loadedConfig
+	mockState.Lock()
+	mockState.powerState = config.System.PowerState
+	mockState.Unlock()
 
 	r := gin.Default()
 

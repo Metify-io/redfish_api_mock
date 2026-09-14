@@ -138,6 +138,69 @@ func TestSupermicroProvisioningBootOverride(t *testing.T) {
 	t.Fatalf("allowable boot targets = %v, want UsbCd", system.Boot.BootSourceOverrideTargetAllowable)
 }
 
+func TestResetSystemUpdatesPowerState(t *testing.T) {
+	previousConfig := config
+	config = defaultConfig()
+	mockState.Lock()
+	previousPowerState := mockState.powerState
+	mockState.Unlock()
+	t.Cleanup(func() {
+		config = previousConfig
+		mockState.Lock()
+		mockState.powerState = previousPowerState
+		mockState.Unlock()
+	})
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/redfish/v1/Systems/:id/Actions/ComputerSystem.Reset", resetSystem)
+	router.GET("/redfish/v1/Systems/:id", getSystem)
+
+	tests := []struct {
+		resetType         string
+		initialPowerState string
+		wantPowerState    string
+	}{
+		{resetType: "ForceOff", initialPowerState: "On", wantPowerState: "Off"},
+		{resetType: "GracefulShutdown", initialPowerState: "On", wantPowerState: "Off"},
+		{resetType: "On", initialPowerState: "Off", wantPowerState: "On"},
+		{resetType: "GracefulRestart", initialPowerState: "Off", wantPowerState: "On"},
+		{resetType: "ForceRestart", initialPowerState: "Off", wantPowerState: "On"},
+		{resetType: "PowerCycle", initialPowerState: "Off", wantPowerState: "On"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.resetType, func(t *testing.T) {
+			mockState.Lock()
+			mockState.powerState = test.initialPowerState
+			mockState.Unlock()
+
+			payload := []byte(`{"ResetType":"` + test.resetType + `"}`)
+			request := httptest.NewRequest(http.MethodPost, "/redfish/v1/Systems/1/Actions/ComputerSystem.Reset", bytes.NewReader(payload))
+			request.Header.Set("Content-Type", "application/json")
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, request)
+			if recorder.Code != http.StatusNoContent {
+				t.Fatalf("POST status = %d, want %d; body = %s", recorder.Code, http.StatusNoContent, recorder.Body.String())
+			}
+
+			request = httptest.NewRequest(http.MethodGet, "/redfish/v1/Systems/1", nil)
+			recorder = httptest.NewRecorder()
+			router.ServeHTTP(recorder, request)
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("GET status = %d, want %d", recorder.Code, http.StatusOK)
+			}
+			var system ComputerSystem
+			if err := json.Unmarshal(recorder.Body.Bytes(), &system); err != nil {
+				t.Fatalf("decode system response: %v", err)
+			}
+			if system.PowerState != test.wantPowerState {
+				t.Fatalf("PowerState = %q, want %q", system.PowerState, test.wantPowerState)
+			}
+		})
+	}
+}
+
 func TestLoadConfigRejectsUnsupportedOEM(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	if err := os.WriteFile(path, []byte(`{"oem":"unknown"}`), 0o600); err != nil {
