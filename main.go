@@ -602,7 +602,6 @@ func patchSystem(c *gin.Context) {
 	}
 
 	mockState.Lock()
-	defer mockState.Unlock()
 	bootEnabled := mockState.bootSourceOverrideEnabled
 	bootTarget := mockState.bootSourceOverrideTarget
 	bootMode := mockState.bootSourceOverrideMode
@@ -612,6 +611,7 @@ func patchSystem(c *gin.Context) {
 		case "Disabled", "Once", "Continuous":
 			bootEnabled = *req.Boot.BootSourceOverrideEnabled
 		default:
+			mockState.Unlock()
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported BootSourceOverrideEnabled value"})
 			return
 		}
@@ -621,6 +621,7 @@ func patchSystem(c *gin.Context) {
 		case "None", "Cd", "Hdd", "Pxe", "Usb", "UsbCd":
 			bootTarget = *req.Boot.BootSourceOverrideTarget
 		default:
+			mockState.Unlock()
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported BootSourceOverrideTarget value"})
 			return
 		}
@@ -630,6 +631,7 @@ func patchSystem(c *gin.Context) {
 		case "UEFI", "Legacy":
 			bootMode = *req.Boot.BootSourceOverrideMode
 		default:
+			mockState.Unlock()
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported BootSourceOverrideMode value"})
 			return
 		}
@@ -637,8 +639,9 @@ func patchSystem(c *gin.Context) {
 	mockState.bootSourceOverrideEnabled = bootEnabled
 	mockState.bootSourceOverrideTarget = bootTarget
 	mockState.bootSourceOverrideMode = bootMode
+	mockState.Unlock()
 
-	c.Status(http.StatusNoContent)
+	getSystem(c)
 }
 
 func resetSystem(c *gin.Context) {

@@ -113,8 +113,15 @@ func TestSupermicroProvisioningBootOverride(t *testing.T) {
 	request.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusNoContent {
-		t.Fatalf("PATCH status = %d, want %d; body = %s", recorder.Code, http.StatusNoContent, recorder.Body.String())
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("PATCH status = %d, want %d; body = %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	var patchedSystem ComputerSystem
+	if err := json.Unmarshal(recorder.Body.Bytes(), &patchedSystem); err != nil {
+		t.Fatalf("decode PATCH response: %v", err)
+	}
+	if patchedSystem.Boot.BootSourceOverrideEnabled != "Once" || patchedSystem.Boot.BootSourceOverrideMode != "Legacy" || patchedSystem.Boot.BootSourceOverrideTarget != "UsbCd" {
+		t.Fatalf("PATCH response boot override = %#v", patchedSystem.Boot)
 	}
 
 	request = httptest.NewRequest(http.MethodGet, "/redfish/v1/Systems/1", nil)
